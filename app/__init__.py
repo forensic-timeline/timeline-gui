@@ -1,8 +1,14 @@
 import os
 from flask import Flask, current_app, send_file
+from app.api import api as api_blueprint
+
+# TODO: Implement HTTPS support
 
 # Vue's static folder
 app = Flask("dftpl_gui_proj", static_folder=r'dist\static')
+
+# Registers blueprints (such as APIs)
+app.register_blueprint(api_blueprint, url_prefix="/api/v1")
 
 # Loads and logs current config
 from .config import Config
@@ -13,7 +19,7 @@ app.logger.info('>>> {}'.format(Config.FLASK_ENV))
 def index_client():
     dist_dir = current_app.config['DIST_DIR']
     print(app.static_folder)
-    entry = os.path.join(dist_dir, 'src', 'start_page', 'index.html')
+    entry = os.path.join(dist_dir, 'src', 'auth', 'index.html')
     # Instead of using Flask's template folder, build path to Vue pages manually.
     return send_file(entry)
 

@@ -3,10 +3,8 @@ import {createRouter, createWebHashHistory} from 'vue-router'
 
 // SFCs
 import App from './App.vue'
-import Start from './views/Start.vue'
-import New from './views/NewProj.vue'
-import Old from './views/OldProj.vue'
-
+import SignIn from './views/SignIn.vue'
+import SignUp from './views/SignUp.vue'
 // Vuetify
 import 'vuetify/styles'
 import { createVuetify } from 'vuetify'
@@ -22,19 +20,18 @@ const router = createRouter(
     history: createWebHashHistory(),
     routes: [
       {
-        path: '/start',
-        name: 'start',
-        component: Start
+        path: '/sign-in',
+        name: 'sign-in',
+        component: SignIn
       },
       {
-        path: '/old',
-        name: 'old',
-        component: Old
+        path: '/',
+        redirect: '/sign-in'
       },
       {
-        path: '/new',
-        name: 'new',
-        component: New
+        path: '/sign-up',
+        name: 'sign-up',
+        component: SignUp
       }
     ]
   }
@@ -44,7 +41,7 @@ const vuetify = createVuetify({
     components,
     directives,
     icons: {
-      defaultSet: 'fa',
+      defaultSet: 'mdi',
       aliases,
       sets: {
         mdi, fa

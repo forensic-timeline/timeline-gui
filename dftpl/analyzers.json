@@ -1,0 +1,11 @@
+{
+    "analyzers-list": [{
+        "name": "google-search",
+        "analyzer-category": "Web"
+    },
+    {
+        "name": "windows-shutdown",
+        "analyzer-category": "System"
+    }
+]
+}

@@ -1,4 +1,4 @@
-<!-- TODO: Can be converted into a universal loading overlay component used by different screens -->
+<!-- TODO: Convert into a universal loading overlay component used by different screens -->
 
 <script>
 </script>
