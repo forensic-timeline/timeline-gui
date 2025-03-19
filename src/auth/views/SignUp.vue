@@ -3,6 +3,8 @@ import AccountForm from '../components/AccountForm.vue';
 import { ref } from 'vue'
 const temp_fetch_api = ref(null);
 function on_submit(username, password, confirm){
+
+    // Sends form data to API
     console.log(JSON.stringify({ "username": username, "password": password, "confirm": confirm }))
     const requestOptions = {
         method: "POST",
