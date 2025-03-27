@@ -23,11 +23,11 @@ def index_client():
     # Instead of using Flask's template folder, build path to Vue pages manually.
     return send_file(entry)
 
-@app.route('/plot_sandbox')
+@app.route('/timeline_sandbox')
 def index_plot_sandbox():
     dist_dir = current_app.config['DIST_DIR']
     print(app.static_folder)
-    entry = os.path.join(dist_dir, 'src', 'plot_sandbox', 'index.html')
+    entry = os.path.join(dist_dir, 'src', 'timeline_sandbox', 'index.html')
     # Instead of using Flask's template folder, build path to Vue pages manually.
     return send_file(entry)
 

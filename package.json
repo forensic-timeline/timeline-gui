@@ -11,6 +11,8 @@
   "dependencies": {
     "@observablehq/plot": "^0.6.17",
     "css-loader": "^7.1.2",
+    "jquery": "^3.7.1",
+    "jstree": "^3.3.17",
     "vue": "^3.5.13",
     "vuetify": "^3.7.12"
   },
