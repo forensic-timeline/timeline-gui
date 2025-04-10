@@ -2,7 +2,7 @@
 import { jstree } from "jquery"
 import "jstree"
 import { ref, onMounted, useTemplateRef } from 'vue'
-const pElementRef = useTemplateRef('pElementRef')
+const timelines = [useTemplateRef('timeline1')]
 
 onMounted(() => {
     jstree.create(pElementRef.value, { 'core' : {
@@ -25,7 +25,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <div ref="pElementRef">Hello</div>
+    <div ref="timeline1">Hello</div>
 </template>
 
 <style>
