@@ -44,8 +44,10 @@ def auth():
 # TODO: Add redirect if user is logged in for login route
 #             if current_user.is_authenticated:
 
+
 @app.route('/timeline_sandbox')
-@login_required 
+#TEST: Testing visualization
+#@login_required 
 def index_plot_sandbox():
     entry = str(PurePosixPath('src', 'timeline_sandbox', 'index.html'))
     # Instead of using Flask's template folder, build path to Vue pages manually.

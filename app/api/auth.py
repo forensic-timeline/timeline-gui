@@ -135,6 +135,4 @@ def sign_up():
 @api.route("/get-user", methods=["GET"])
 @login_required
 def get_user():
-    #TEST
-    print(f"CURR USER: {current_user.username}")
     return [current_user.username]

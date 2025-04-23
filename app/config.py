@@ -28,6 +28,8 @@ class Config(object):
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
         'sqlite:///' + os.path.join(APP_DIR, 'app.db')
 
+    # TODO: Use this for all api calls
     # API Path
     API_URL_PREFIX = "/api/v1"
+
 app.config.from_object('app.config.Config')

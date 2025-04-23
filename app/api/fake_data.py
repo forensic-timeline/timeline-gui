@@ -12,14 +12,16 @@ def get_test_timeline_json():
     fake = Faker()
     data = []
     count = 1
-    for i in range(5*100):
-        current_app.logger.info(f'On folder: {count}')
-        new_obj = {"text": str(count) + "..." + str(count + 999), "children": []}
-        for j in range(1000):
-            new_obj["children"].append({
-                "text": "child:" + str(count)
-            })
-            count += 1
-        data.append(new_obj)
+    for h in range(5):
+        timeline = []
+        for i in range(1):
+            new_obj = {"text": str(count) + "...", "children": []}
+            for j in range(10):
+                new_obj["children"].append({
+                    "text": "child:" + str(count)
+                })
+                count += 1
+            timeline.append(new_obj)
+        data.append(timeline)
 
     return data
