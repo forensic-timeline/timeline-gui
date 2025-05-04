@@ -18,6 +18,7 @@ export default defineConfig({
         // TODO: Only build pages needed
         //start_page: resolve(__dirname, 'src/start_page/index.html'),
         auth: resolve(__dirname, 'src/auth/index.html'),
+        start_page: resolve(__dirname, 'src/start_page/index.html'),
         timeline_sandbox: resolve(__dirname, 'src/timeline_sandbox/index.html')
       }
     },

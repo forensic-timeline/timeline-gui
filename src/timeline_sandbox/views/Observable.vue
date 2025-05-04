@@ -1,5 +1,5 @@
 <script setup>
-import * as Plot from "@observablehq/plot"
+// import * as Plot from "@observablehq/plot"
 import { ref, onMounted } from 'vue'
 import flare from "../static/flare-2.json"
 const pElementRef = ref(null)

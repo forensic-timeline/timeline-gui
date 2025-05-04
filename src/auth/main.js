@@ -1,5 +1,5 @@
 import { createApp } from 'vue'
-import {createRouter, createWebHashHistory} from 'vue-router'
+import {createRouter, createWebHashHistory, createMemoryHistory } from 'vue-router'
 
 // SFCs
 import App from './App.vue'
@@ -32,6 +32,11 @@ const router = createRouter(
         path: '/sign-up',
         name: 'sign-up',
         component: SignUp
+      },
+      {
+        // To catch 404 errors using history mode.
+        path: '/:pathMatch(.*)',
+        redirect: '/sign-in' // FIXME: Show proper 404 page
       }
     ]
   }

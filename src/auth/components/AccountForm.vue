@@ -4,6 +4,7 @@ import { ref, defineProps, defineEmits } from 'vue'
 // Emit form submition event and values
 const emit = defineEmits(['submit_event'])
 
+// Props used for reusability between sign in and sign up
 const props = defineProps(['is_sign_up', 'username', 'password', 'confirm'])
 const is_sign_up = ref(props.is_sign_up === 'true')
 
@@ -85,12 +86,11 @@ const confirmRules = [
 
 // Wait for button's submit event to resolve
 function on_submit() {
-    // console.log("waiting...")
-    // myForm.value?.validate().then(({ valid: isValid }) => {
-    //     if (isValid){
+    myForm.value?.validate().then(({ valid: isValid }) => {
+        if (isValid){
             emit('submit_event', username.value, password.value, confirm.value)
-    //     }
-    // })
+        }
+    })
 }
 
 const visible1 = ref(false)
@@ -103,7 +103,7 @@ const visible2 = ref(false)
 
 
 <template>
-    <v-form ref="myForm">
+    <v-form ref="myForm" @submit.prevent="on_submit" >
         <v-container fluid>
             <v-row>
                 <v-col cols="12" sm="6">
@@ -130,11 +130,11 @@ const visible2 = ref(false)
                         density="compact" placeholder="Confirm your password" prepend-inner-icon="mdi-lock-outline"
                         variant="outlined" @click:append-inner="visible2 = !visible2" autocomplete="new-password"></v-text-field>
                     <!-- Depends on is_sign_in -->
-                    <v-btn v-if="is_sign_up" @click="on_submit" type="submit" class="mb-8" color="blue" size="large"
+                    <v-btn v-if="is_sign_up" type="submit" class="mb-8" color="blue" size="large"
                         variant="tonal" block>
                         Sign Up
                     </v-btn>
-                    <v-btn v-else @click="on_submit" type="submit" class="mb-8" color="blue" size="large"
+                    <v-btn v-else type="submit" class="mb-8" color="blue" size="large"
                         variant="tonal" block>
                         Sign In
                     </v-btn>

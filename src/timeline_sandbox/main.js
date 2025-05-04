@@ -3,7 +3,7 @@ import {createRouter, createWebHashHistory} from 'vue-router'
 
 // SFCs
 import App from './App.vue'
-import Observable from './views/Observable.vue'
+// import Observable from './views/Observable.vue'
 import JsTree from './views/JsTree.vue'
 // Vuetify
 import 'vuetify/styles'
@@ -19,11 +19,11 @@ const router = createRouter(
   {
     history: createWebHashHistory(),
     routes: [
-      {
-        path: '/observable',
-        name: 'observable',
-        component: Observable
-      },
+      // {
+      //   path: '/observable',
+      //   name: 'observable',
+      //   component: Observable
+      // },
       {
         path: '/',
         name: 'jstree',

@@ -1,5 +1,5 @@
 import { createApp } from 'vue'
-import {createRouter, createWebHashHistory} from 'vue-router'
+import {createRouter,createWebHashHistory, createMemoryHistory } from 'vue-router'
 
 // SFCs
 import App from './App.vue'
@@ -17,12 +17,16 @@ import "@fortawesome/fontawesome-free/css/all.css"; // Ensure your project is ca
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 
+// Dropzone
+// HACK: Default css, may not fit with vuetify
+import "@deltablot/dropzone/src/dropzone.scss";
+
 const router = createRouter(
   {
     history: createWebHashHistory(),
     routes: [
       {
-        path: '/start',
+        path: '/',
         name: 'start',
         component: Start
       },

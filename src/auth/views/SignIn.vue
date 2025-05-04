@@ -5,11 +5,8 @@ import { ref } from 'vue'
 // Stores API reply like error codes
 const temp_fetch_api = ref(null);
 async function on_submit(username, password) {
-
-    // Client-side validation
-
     // Sends form data to API
-    console.log(JSON.stringify({ "username": username, "password": password }))
+
     const requestOptions = {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -20,7 +17,7 @@ async function on_submit(username, password) {
         .then(response => response.json())
         .then(data => temp_fetch_api.value = data);
     if (temp_fetch_api.value["message"] == "redirect") {
-        window.location.replace("timeline_sandbox")
+        window.location.replace("start")
     }
 }
 </script>

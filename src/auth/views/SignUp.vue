@@ -15,6 +15,9 @@ async function on_submit(username, password, confirm){
     await fetch(`/api/v1/sign-up`, requestOptions)
         .then(response => response.json())
         .then(data => temp_fetch_api.value = data);
+    if (temp_fetch_api.value["message"] == "redirect") {
+        window.location.replace("start")
+    }
 }
 
 </script>

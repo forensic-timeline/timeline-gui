@@ -1,17 +1,21 @@
-from flask import request, redirect, url_for
-from app.api import api
+import re
+from os import remove
+from os.path import join, exists
+import sqlalchemy as sa
+from flask import request, session, current_app
+
+# Auth
+from flask_login import current_user, login_required, login_user, logout_user
 
 # Input validation
 # TODO: Import parts of validators to reduce size
 # FIXME: Check for ERROR HANDLING FOR flask-login
-from wtforms import Form, StringField, PasswordField, validators
-import re
+from wtforms import Form, PasswordField, StringField, validators
 
-# Auth
-from flask_login import login_user, logout_user, login_required, current_user
-import sqlalchemy as sa
 from app import db
-from app.models import User
+from app.api import api
+from app.model.user_model import User
+
 # Validation
 # field.data is sanitized by WTFORMS
 
@@ -78,7 +82,8 @@ class ValidateSignIn(Form):
 
 
 
-
+#FIXME: If accessing without auth, stop redirecting with arguments
+#FIXME: Why sometimes after server reset, it takes multiple attempts to login before success?
 @api.route("/sign-in", methods=["POST"])
 def sign_in():
     try:
@@ -95,6 +100,7 @@ def sign_in():
                 return {"message": "ERROR: Wrong username or password!"}
             if current_user.is_authenticated:
                 return {"message": "ERROR: Please log out from your first browser first!"}
+            login_user(user)
             # TODO: Redirect to project upload
             return {
             "message": "redirect"
@@ -103,14 +109,39 @@ def sign_in():
     except (validators.StopValidation, validators.ValidationError) as e:
         return {"message": str(e)}
 
-
+# TODO: 
+# 1. Call SQLAlchemy's Engine.dispose() so db file isn't being used.
+# 2. clean all user files from 'projects' dir
+#If server exits unexpectedly, no cleaning is needed.
+#User may need to recover notes in db.
 @api.route("/sign-out", methods=["GET"])
 @login_required
 def logout():
+    # TODO: Check if session and it's info is deleted entirely
     print(f"Logged out {current_user.username}")
     logout_user()
     # TODO: Redirect back to login
     return {"message": "Logged out!"}
+
+# On LOGOUT (event listener setup in __init__):
+# Delete user's session variables and files
+# 1. CSV Path (Should delete after sqlite db is created)
+# 2. SQLite file
+# FIXME: Check if valid path for removal
+# NOTE: Doesn't get called when program terminates, only when user logs out
+# TODO: Clean up when program terminates (clean folder instead on individual files)
+def clean_up(csv=True, db=True):
+    if csv and "session_csv" in session and exists(session['session_csv']):
+        remove(join(current_app.config['UPLOAD_DIR'], session.pop('session_csv', None)))
+    else:
+        # HACK
+        print("WARNING: Tried to clean up session var, but key is missing/no value")
+    if db and "session_db" in session and exists(session['session_db']):
+        session.pop('session_db_engine', None)
+        remove(join(current_app.config['UPLOAD_DIR'], session.pop('session_db', None)))
+    else:
+        # HACK
+        print("WARNING: Tried to clean up session var, but key is missing/no value")
 
 
 # FIXME: Why there's an empty account at id 0? Subsequent submission doesn't generate that empty account.
