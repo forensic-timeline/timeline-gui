@@ -128,21 +128,30 @@ def logout():
 # 1. CSV Path (Should delete after sqlite db is created)
 # 2. SQLite file
 # FIXME: Check if valid path for removal
+# Returns 0 for success, -1 for OSError or FileNotFoundError, -2 for unknowns
 # NOTE: Doesn't get called when program terminates, only when user logs out
 # TODO: Clean up when program terminates (clean folder instead on individual files)
 def clean_up(csv=True, db=True):
-    if csv and "session_csv" in session and exists(session['session_csv']):
-        remove(join(current_app.config['UPLOAD_DIR'], session.pop('session_csv', None)))
-    else:
+    try:
+        if csv and "session_csv" in session:
+            remove(join(current_app.config['UPLOAD_DIR'], session.pop('session_csv', None)))
+        else:
+            # HACK
+            print("WARNING: Tried to clean up session var, but key is missing/no value")
+        if db and "session_db" in session:
+            remove(join(current_app.config['UPLOAD_DIR'], session.pop('session_db', None)))
+        else:
+            # HACK
+            print("WARNING: Tried to clean up session var, but key is missing/no value")
+    except (OSError, FileNotFoundError) as e:
         # HACK
-        print("WARNING: Tried to clean up session var, but key is missing/no value")
-    if db and "session_db" in session and exists(session['session_db']):
-        session.pop('session_db_engine', None)
-        remove(join(current_app.config['UPLOAD_DIR'], session.pop('session_db', None)))
-    else:
+        print(e.strerror)
+        return -1
+    except:
         # HACK
-        print("WARNING: Tried to clean up session var, but key is missing/no value")
-
+        print("Unknown error while clean_up")
+        return -2
+    return 0
 
 # FIXME: Why there's an empty account at id 0? Subsequent submission doesn't generate that empty account.
 @api.route("/sign-up", methods=["POST"])

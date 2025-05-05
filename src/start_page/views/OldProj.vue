@@ -1,14 +1,11 @@
 <!-- TODO: Add icons to buttons for accessibility -->
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watchEffect } from 'vue'
 // Dropzone for chunked upload
 // Validation for file size and type is handled by Dropzone
 import { Dropzone } from "@deltablot/dropzone"
-
-// The 'File' object will be automatically stored in an array.
-// To access a single file upload directly, use the first member ([0])
-// https://stackoverflow.com/questions/857618/javascript-how-to-extract-filename-from-a-file-input-control
-const file_value = ref()
+// Import component for getting hash of uploaded file
+import ConfirmIntegrity from '../components/ConfirmIntegrity.vue'
 
 // Dropzone
 const dropzoneRef = ref() // Ref to component where dropzone is initialized
@@ -17,20 +14,20 @@ var myDropzone = false // Dropzone can only be initialized AFTER mounted
 // Ref to vuetify form
 const myForm = ref();
 const is_upload = ref(false)
+const is_success = ref(false)
 const upload_progress = ref()
-// Client-side validation using vuetify array of rule functions
-function on_submit() {
-  console.log("waiting...")
 
-  myForm.value?.validate().then(async ({ valid: isValid }) => {
-    if (isValid && myDropzone) {
-      // TODO: Prompt message if user haven't selected a file
-      console.log("GO!")
-      myDropzone.processQueue()
-      // TODO: Redirect to main
-    }
-  })
+// Ref to ConfirmIntegrity component
+const confirmIntegrity = ref()
+
+function on_submit() {
+  if (myDropzone) {
+    // TODO: Prompt message if user haven't selected a file
+    myDropzone.processQueue()
+    // TODO: Redirect to main
+  }
 }
+
 
 onMounted(async () => {
   // Initialize Dropzone
@@ -66,6 +63,10 @@ onMounted(async () => {
   myDropzone.on("sending", function (file, xhr, formData) {
     is_upload.value = true
   })
+  // Show ConfirmIntegrity component
+  myDropzone.on("success", function () {
+    is_success.value = true
+  })
   // TODO: On upload failure, check if file validation failed or not
   // Reset if failed
   myDropzone.on("error", function (file, response) {
@@ -74,6 +75,22 @@ onMounted(async () => {
 
   // TODO: Add option to cancel upload
 
+})
+
+
+function atCleanUp() {
+  if (myDropzone) {
+    myDropzone.removeFile(myDropzone.getAcceptedFiles()[0])
+    is_upload.value = false
+    is_success.value = false
+  }
+}
+
+// Watch for state changes
+watchEffect(() => {
+  if (is_success.value && confirmIntegrity.value) {
+    confirmIntegrity.value.loadHash()
+  }
 })
 </script>
 
@@ -104,7 +121,8 @@ onMounted(async () => {
           </v-row>
         </v-col>
       </v-form>
-
+      <ConfirmIntegrity @CleanUpFinished="atCleanUp" v-if="is_success" ref="confirmIntegrity">
+      </ConfirmIntegrity>
     </v-row>
   </v-container>
 </template>

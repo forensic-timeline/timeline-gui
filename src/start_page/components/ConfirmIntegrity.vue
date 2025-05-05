@@ -1,0 +1,64 @@
+<script setup>
+import { ref } from 'vue'
+
+// Event to notify parent to clean up upload view
+const emit = defineEmits(['CleanUpFinished'])
+
+const server_response = ref(null);
+const file_hash = ref("")
+
+// Sends request for server to clean up uploaded file and data
+async function cleanUp() {
+    // Sends form data to API
+
+    const requestOptions = {
+        method: "GET",
+    };
+
+    await fetch(`/api/v1/upload/undo-upload`, requestOptions)
+        .then(response => response.status)
+        .then(data => server_response.value  = data)
+    // TEST
+        if (server_response.value == 200){
+            emit("CleanUpFinished")
+        }
+    
+}
+
+// Gets called by parent to get the hash of recently uploaded file
+async function loadHash() {
+    // Sends form data to API
+
+    const requestOptions = {
+        method: "GET",
+    };
+
+    await fetch(`/api/v1/upload/confirm-hash`, requestOptions)
+        .then(response => response.text())
+        .then(data => file_hash.value  = data)
+}
+
+defineExpose({
+    loadHash
+});
+</script>
+
+<template>
+    <v-card class="mx-auto">
+        <template v-slot:title>
+            <span class="font-weight-black">Please confirm SHA256 file hash below with your local file</span>
+        </template>
+
+        <v-card-text class="bg-surface-light pt-4">
+            {{ file_hash }}
+        </v-card-text>
+    </v-card>
+    <!-- TODO: Redirect to main page -->
+    <v-btn variant="tonal" color="green">
+        Continue to main page
+    </v-btn>
+    <v-btn @click="cleanUp" variant="flat" color="red-lighten-3">
+        Delete file and reupload
+    </v-btn>
+
+</template>

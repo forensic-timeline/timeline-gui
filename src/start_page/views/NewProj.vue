@@ -1,9 +1,11 @@
 <!-- TODO: Add icons to buttons for accessibility -->
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watchEffect } from 'vue'
 // Dropzone for chunked upload
 // Validation for file size and type is handled by Dropzone
 import { Dropzone } from "@deltablot/dropzone"
+// Import component for getting hash of uploaded file
+import ConfirmIntegrity from '../components/ConfirmIntegrity.vue'
 
 const selected_analyzers = ref([])
 const analyzer_list = ref([])
@@ -16,7 +18,11 @@ var myDropzone = false // Dropzone can only be initialized AFTER mounted
 // Ref to vuetify form
 const myForm = ref();
 const is_upload = ref(false)
+const is_success = ref(false)
 const upload_progress = ref()
+
+// Ref to ConfirmIntegrity component
+const confirmIntegrity = ref()
 
 // Client-side validation using vuetify array of rule functions
 const analyzer_list_rule = [
@@ -43,7 +49,6 @@ function on_submit() {
   myForm.value?.validate().then(async ({ valid: isValid }) => {
     if (isValid && myDropzone) {
       // TODO: Prompt message if user haven't selected a file
-      console.log("GO!")
       myDropzone.processQueue()
       // TODO: Redirect to main
     }
@@ -69,27 +74,31 @@ onMounted(async () => {
   })
 
   // Clear selected file if another file is dropped
-  myDropzone.on("addedfile", function(file){
+  myDropzone.on("addedfile", function (file) {
     // If a new file is selected, remove the previous one
     // Returns an array, so access the first item
-    if(myDropzone.getAcceptedFiles()[0]){
+    if (myDropzone.getAcceptedFiles()[0]) {
       myDropzone.removeFile(myDropzone.getAcceptedFiles()[0])
     }
   })
 
   // Display upload progress
-  myDropzone.on("uploadprogress", function(file, progress, bytesSent) {
+  myDropzone.on("uploadprogress", function (file, progress, bytesSent) {
     upload_progress.value = progress.toFixed(2)
   })
 
   // Append selected analyzers value before sending to server
-  myDropzone.on("sending", function(file, xhr, formData){
+  myDropzone.on("sending", function (file, xhr, formData) {
     formData.append('analyzers', selected_analyzers.value)
     is_upload.value = true
   })
+  // Show ConfirmIntegrity component
+  myDropzone.on("success", function () {
+    is_success.value = true
+  })
   // TODO: On upload failure, check if file validation failed or not
-    // Reset if failed
-  myDropzone.on("error", function(file, response){
+  // Reset if failed
+  myDropzone.on("error", function (file, response) {
     is_upload.value = false
   })
 
@@ -97,6 +106,20 @@ onMounted(async () => {
 
 })
 
+function atCleanUp() {
+  if (myDropzone) {
+    myDropzone.removeFile(myDropzone.getAcceptedFiles()[0])
+    is_upload.value = false
+    is_success.value = false
+  }
+}
+
+// Watch for state changes
+watchEffect(() => {
+  if (is_success.value && confirmIntegrity.value) {
+    confirmIntegrity.value.loadHash()
+  }
+})
 
 </script>
 
@@ -111,7 +134,7 @@ onMounted(async () => {
       TODO: Analyzer search, select/deselect all, grouping, and integrate to actual submitable form.
       -->
       <!-- 'multipart/form-data' Since a file is being uploaded.-->
-       <!-- TEST DROPZONE -->
+      <!-- TEST DROPZONE -->
       <v-form ref="myForm" enctype="multipart/form-data" @submit.prevent="on_submit">
         <v-row>
           <v-container fluid>
@@ -120,7 +143,8 @@ onMounted(async () => {
               <v-virtual-scroll :height="300" :items="analyzer_list">
                 <template v-slot:default="{ item }">
                   <!-- Prevent user from changing analyzer list while file is uploaded -->
-                  <v-checkbox v-model="selected_analyzers" :label="item['name']" :value="item['name']" :disabled="is_upload ? '' : disabled"></v-checkbox>
+                  <v-checkbox v-model="selected_analyzers" :label="item['name']" :value="item['name']"
+                    :disabled="is_upload ? '' : disabled"></v-checkbox>
                 </template>
               </v-virtual-scroll>
             </v-input>
@@ -134,7 +158,7 @@ onMounted(async () => {
               :rules="file_rule" name=file>
 
             </v-file-input> -->
-            
+
             <v-progress-linear v-if="is_upload" v-model="upload_progress" color="purple" height="25">
               <template v-slot:default="{ value }">
                 <strong>{{ Math.ceil(value) }}%</strong>
@@ -148,6 +172,8 @@ onMounted(async () => {
           </v-col>
         </div>
       </v-form>
+      <ConfirmIntegrity @CleanUpFinished="atCleanUp" v-if="is_success" ref="confirmIntegrity">
+      </ConfirmIntegrity>
     </v-col>
   </v-container>
 </template>

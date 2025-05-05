@@ -2,6 +2,7 @@ import csv
 
 # TEST
 import logging
+from hashlib import sha256  # For getting file hash
 from flask import make_response
 from os import SEEK_SET
 from os import remove, rename
@@ -19,6 +20,7 @@ from werkzeug.utils import secure_filename
 
 from app import current_app
 from app.api import api
+from app.api.auth import clean_up
 from app.model.timeline_model import SCHEMA_TABLE_SQL_VAL
 
 DFTPL_CSV_COLUMNS = [
@@ -30,8 +32,13 @@ DFTPL_CSV_COLUMNS = [
     "parser",
     "display_name",
     "tag",
-]
-SQLITE_MAGIC_HEADER_HEX = "53 51 4c 69 74 65 20 66 6f 72 6d 61 74 20 33 00"
+]  # Update if default plaso csv columns changes
+
+SQLITE_MAGIC_HEADER_HEX = (
+    "53 51 4c 69 74 65 20 66 6f 72 6d 61 74 20 33 00"  # From official docs
+)
+
+BUF_SIZE = 10 * 1024 * 1024  # 10 MB chunks for calculating hashes
 
 
 # SET OF ROUTES FOR FILES
@@ -86,8 +93,7 @@ def upload_file():
             return make_response(("ERROR: Invalid Upload Request!", 400))
         # If chunk 0 and total > 1 : Store dzuuid for chunk id, start new upload
         elif (
-            "dzuuid" not in session
-            and int(request.form["dztotalchunkcount"]) > 1
+            int(request.form["dztotalchunkcount"]) > 1
             and int(request.form["dzchunkindex"]) == 0
         ):
             is_first = True
@@ -98,9 +104,11 @@ def upload_file():
         elif int(request.form["dzchunkindex"]) == (
             int(request.form["dztotalchunkcount"]) - 1
         ):
-            if (int(request.form["dztotalchunkcount"]) > 1 
-            and "dzuuid" in session
-            and session["dzuuid"] == request.form["dzuuid"]):
+            if (
+                int(request.form["dztotalchunkcount"]) > 1
+                and "dzuuid" in session
+                and session["dzuuid"] == request.form["dzuuid"]
+            ):
                 is_last = True
             elif int(request.form["dztotalchunkcount"]) == 1:
                 is_one_chunk = True
@@ -108,7 +116,7 @@ def upload_file():
                 return make_response(("ERROR: Invalid Upload Request!", 400))
         # If chunk 1 to total-2: Check if dzuuid matches, if yes process chunk
         elif (
-            "dzuuid" in session 
+            "dzuuid" in session
             and session["dzuuid"] == request.form["dzuuid"]
             and int(request.form["dztotalchunkcount"]) > 1
             and int(request.form["dzchunkindex"]) > 0
@@ -215,7 +223,7 @@ def upload_file():
                                     session["session_csv"],
                                 ),
                             )
-                            session.pop('dzuuid', None) # Clear upload id
+                            session.pop("dzuuid", None)  # Clear upload id
                             return make_response(("File upload successful", 200))
                         except OSError:
                             # FIXME: Log error
@@ -300,7 +308,9 @@ def upload_file():
                         # Generate database uri.
                         # Try to create an engine, a session, and open a connection for query
                         database_uri = "sqlite:///" + join(
-                            current_app.config["UPLOAD_DIR"] + "\\" + f"{session["session_db"]}"
+                            current_app.config["UPLOAD_DIR"]
+                            + "\\"
+                            + f"{session['session_db']}"
                         )
                         engine = create_engine(database_uri)
 
@@ -331,10 +341,13 @@ def upload_file():
                                 return make_response(
                                     ("ERROR: Invalid sqlite file!", 400)
                                 )
-                        session.pop('dzuuid', None) # Clear upload id
-                        # Close session connection.
+                        session.pop("dzuuid", None)  # Clear upload id
                         # NOTE: File will still be in use.
+                        # Do these 3 to close DB connections
+                        result.close()  # Close result proxy con
                         db_session.remove()
+                        engine.dispose()
+                        # Clean session value
                         return make_response(("File upload successful", 200))
 
                     return make_response(("Chunk upload successful", 200))
@@ -346,7 +359,51 @@ def upload_file():
             return make_response(("ERROR: File size too large!", 400))
     else:
         return make_response(("ERROR: Invalid Upload Request!", 400))
-    return make_response(("ERROR: Unknown upload error encountered!", 500))
+
+
+# Generates a SHA256 hash to help user confirm uploaded file's integrity
+@api.route("/upload/confirm-hash", methods=["GET"])
+@login_required
+def confirm_hash():
+    if "session_csv" in session or "session_db" in session:
+        file_name = (
+            session["session_csv"]
+            if "session_csv" in session
+            else session["session_db"]
+        )
+        if request.method == "GET":
+            try:
+                h_sha256 = sha256()
+                with open(join(current_app.config["UPLOAD_DIR"], file_name), "rb") as f:
+                    while True:
+                        data = f.read(BUF_SIZE)
+                        if not data:
+                            break
+                        h_sha256.update(data)
+                return make_response(
+                    f"File '{file_name}' hash: {h_sha256.hexdigest()}", 200
+                )
+            except IOError:
+                # TODO: Log and handle exception instead of returning raw text
+                return make_response("Unknown error while reading file", 400)
+        # elif request.method == "POST":
+        else:
+            return make_response("", 400)
+    else:
+        return make_response("", 400)
+
+
+# Deletes uploaded file and session data about file
+# Allows user to upload a file without refreshing the page or logging out
+@api.route("/upload/undo-upload", methods=["GET"])
+@login_required
+def undo_upload():
+    if clean_up() < 0:
+        return make_response(
+            "Error while clean up, please check server for more information.", 500
+        )
+    else:
+        return make_response("", 200)
 
 
 @api.route("/uploads/<name>", methods=["GET"])
