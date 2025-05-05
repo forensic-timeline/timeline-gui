@@ -1,13 +1,17 @@
 import csv
+
+# TEST
+import logging
+from flask import make_response
 from os import SEEK_SET
-from os import remove
-from os.path import join
+from os import remove, rename
+from os.path import join, getsize
 from secrets import token_hex  # Generate random file name
 
 from flask import flash, redirect, request, send_from_directory, session, url_for
 from flask_login import login_required
 
-# TEST: Following https://flask.palletsprojects.com/en/stable/patterns/sqlalchemy/#manual-object-relational-mapping
+# Following https://flask.palletsprojects.com/en/stable/patterns/sqlalchemy/#manual-object-relational-mapping
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import scoped_session, sessionmaker
 from werkzeug.exceptions import RequestEntityTooLarge  # Exceptions
@@ -17,157 +21,341 @@ from app import current_app
 from app.api import api
 from app.model.timeline_model import SCHEMA_TABLE_SQL_VAL
 
-DFTPL_CSV_COLUMNS = ["datetime","timestamp_desc","source","source_long","message","parser","display_name","tag"]
+DFTPL_CSV_COLUMNS = [
+    "datetime",
+    "timestamp_desc",
+    "source",
+    "source_long",
+    "message",
+    "parser",
+    "display_name",
+    "tag",
+]
 SQLITE_MAGIC_HEADER_HEX = "53 51 4c 69 74 65 20 66 6f 72 6d 61 74 20 33 00"
+
 
 # SET OF ROUTES FOR FILES
 # TODO: Associate ONLY 1 file upload and downloads with the respective user
 # Store engine object in user/session data. If already exists, reject file upload.
 # Check allowed files
 def allowed_file(filename):
-    if ('.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in current_app.config['UPLOAD_EXTENSIONS']):
-        return filename.rsplit('.', 1)[1].lower()
+    if (
+        "." in filename
+        and filename.rsplit(".", 1)[1].lower()
+        in current_app.config["UPLOAD_EXTENSIONS"]
+    ):
+        return filename.rsplit(".", 1)[1].lower()
     else:
         return False
-    
+
+
 # Upload new/old projects
 # TODO: X Threading or multiprocessing for each user
 # TODO: Add integrity hash check after file is saved, give user option to delete (EX: by logging out) if corrupted.
-@api.route('/upload', methods=['POST'])
-@login_required 
+@api.route("/upload", methods=["POST"])
+@login_required
 def upload_file():
     # Checks if user already uploaded a valid file before
-    if not('session_csv' in session or 'session_db' in session) and request.method == 'POST':
-        
+    if (
+        not (
+            ("session_csv" in session or "session_db" in session)
+            and "dzuuid" not in session
+        )
+        and request.method == "POST"
+    ):
+        # Check if request is missing a Dropzone request value
+        if (
+            "dzuuid" not in request.form
+            or "dzchunkindex" not in request.form
+            or "dztotalfilesize" not in request.form
+            or "dzchunksize" not in request.form
+            or "dztotalchunkcount" not in request.form
+            or "dzchunkbyteoffset" not in request.form
+        ):
+            return make_response(("ERROR: Invalid Upload Request!", 400))
+        # Chunk type checking is done here for clarity
+        is_first = False
+        is_middle = False
+        is_last = False
+        is_one_chunk = False  # For files smaller than a chunk that only 1 chunk is sent
+        # If invalid request: Return error
+        if (
+            int(request.form["dztotalchunkcount"]) < 1
+            or int(request.form["dzchunkindex"]) < 0
+        ):
+            return make_response(("ERROR: Invalid Upload Request!", 400))
+        # If chunk 0 and total > 1 : Store dzuuid for chunk id, start new upload
+        elif (
+            "dzuuid" not in session
+            and int(request.form["dztotalchunkcount"]) > 1
+            and int(request.form["dzchunkindex"]) == 0
+        ):
+            is_first = True
+            session["dzuuid"] = request.form["dzuuid"]
+        # If chunk total-1: Check if dzuuid matches, if yes save file
+        # For total>1, erase session["dzuuid"] when done
+        # For total = 1, save file without saving "dzuuid"
+        elif int(request.form["dzchunkindex"]) == (
+            int(request.form["dztotalchunkcount"]) - 1
+        ):
+            if (int(request.form["dztotalchunkcount"]) > 1 
+            and "dzuuid" in session
+            and session["dzuuid"] == request.form["dzuuid"]):
+                is_last = True
+            elif int(request.form["dztotalchunkcount"]) == 1:
+                is_one_chunk = True
+            else:
+                return make_response(("ERROR: Invalid Upload Request!", 400))
+        # If chunk 1 to total-2: Check if dzuuid matches, if yes process chunk
+        elif (
+            "dzuuid" in session 
+            and session["dzuuid"] == request.form["dzuuid"]
+            and int(request.form["dztotalchunkcount"]) > 1
+            and int(request.form["dzchunkindex"]) > 0
+        ):
+            is_middle = True
+        # Default to error
+        else:
+            return make_response(("ERROR: Invalid Upload Request!", 400))
+        # FIXME: If upload interrupted and never finishes?
+        # HACK: This assumes the file is uploaded entirely in one go without interruptions
+
         try:
             # check if the post request has the file part
-            if 'file' not in request.files:
-                flash('Invalid Upload Request')
-                return {"message": "ERROR: Invalid Upload Request!"}
-            file = request.files['file']
+            if "file" not in request.files:
+                return make_response(("ERROR: Invalid Upload Request!", 400))
+            file = request.files["file"]
             # If the user does not select a file, the browser submits an
             # empty file without a filename.
             # TODO: Show error to user for redundancy
-            if file.filename == '':
-                flash('No selected file')
-                return {"message": "ERROR: No selected file"}
+            if file.filename == "":
+                return make_response(("ERROR: No selected file!", 400))
+
             if file:
-                # TODO: VALIDATE FILE CONTENTS (Name/extentions can be falsified)
-                # TODO: Handle empty files
                 file_type = allowed_file(file.filename)
                 # csv
-                # TODO: Integrate csv validation with dftpl csv reading+timeline object creation
                 # Create the dftpl timeline object while validating
                 # Call dftpl program with the object + list of analyzer
                 # Just don't call dftpl if an error is caught
                 if file_type == "csv":
-                    # FIXME: Check if file already exists
-                    # Read csv file content
-                    # Get the binary stream, decode into valid csv string iterable
-                    # TEST: Simple test structure   
-                    # Since this assumes python default encoding 'utf-8', handle exceptions if it's not
-                    try:
-                        spamreader = csv.DictReader(file.stream.read(150).decode().split("\n"), delimiter=',', quotechar='|')
-                    except UnicodeDecodeError:
-                        return{"message": "ERROR: Invalid csv character encoding, please use utf-8."}
-                    except:
-                        return{"message": "ERROR: Unknown error reading csv."}
+                    print(request.form["analyzers"])
                     # Checks for header structure
-                    if len(spamreader.fieldnames) > 0:
-                        for (index, column) in enumerate(spamreader.fieldnames):
-                            if column != DFTPL_CSV_COLUMNS[index]:
-                                # TODO: Handle invalid csv header
-                                return {"message": "ERROR: Invalid csv header, use default plaso csv output."}
-                        file.stream.seek(SEEK_SET) # Return to beginning of stream after checking file content then save file.
+                    if is_first or is_one_chunk:
+                        # Read csv file content
+                        # Get the binary stream, decode into valid csv string iterable
+                        # Since this assumes python default encoding 'utf-8', handle exceptions if it's not
+                        try:
+                            spamreader = csv.DictReader(
+                                file.stream.read(150).decode().split("\n"),
+                                delimiter=",",
+                                quotechar="|",
+                            )
+                        except (UnicodeDecodeError, OSError):
+                            return make_response(
+                                ("ERROR: Error while reading file stream.", 500)
+                            )
+                        except:
+                            return make_response(
+                                ("ERROR: Unknown error reading csv.", 400)
+                            )
 
-                        # If header is correct, save the file
-                        filename = token_hex(8) + secure_filename(file.filename) 
-                        file.save(join(current_app.config['UPLOAD_DIR'], filename))
-                        # Store path to session to process csv and deleting afterwards
-                        session['session_csv'] = filename
+                        if len(spamreader.fieldnames) > 0:
+                            for index, column in enumerate(spamreader.fieldnames):
+                                if column != DFTPL_CSV_COLUMNS[index]:
+                                    # TEST
+                                    return make_response(
+                                        (
+                                            "ERROR: Invalid csv header, use default plaso csv output.",
+                                            400,
+                                        )
+                                    )
+                            file.stream.seek(
+                                SEEK_SET
+                            )  # Return to beginning of stream after checking file content then save file.
+                            filename = token_hex(8) + secure_filename(
+                                file.filename
+                            )  # Since new upload request = new file hash name
+                            # Store path to session to process csv and deleting afterwards
+                            session["session_csv"] = filename
+                        else:
+                            return make_response(("ERROR: Invalid csv file!", 400))
 
-                        # TODO: Move to it's own python file
-                        # Call function for database storage and DFTPL processing.
-                        #TODO: Handle passing analyzer list to dftpl
-                        # Loop to read and sanitize rows into dftpl timeline object
-                        # If no row, return error.
-                        # If a row with missing column is detected, notify user (which row) and cancel process (delete db, csv)
-                        # Else, notify that process succeeds and pass timeline object to dftpl
+                    # TEST: Save chunk
+                    # Store to 'temp' folder with temporary extension
+                    try:
+                        with open(
+                            join(
+                                current_app.config["TEMP_DIR"],
+                                session["session_csv"] + ".tmp",
+                            ),
+                            "ab",
+                        ) as f:
+                            f.seek(int(request.form["dzchunkbyteoffset"]))
+                            f.write(file.stream.read())
+                    except OSError as e:
+                        # TODO: Logging
+                        print(e)
+                        return make_response(
+                            ("ERROR: Error while writing to disk!", 500)
+                        )
 
-                        # TEST
-                        print("Hellow" + filename)
-                        return redirect(url_for('api.download_file', name=filename))
-                    else:
-                        # TODO: Handle invalid csv file
-                        return {"message": "ERROR: Invalid csv file!"}
-                    
+                    # If upload is interrupted, must redo from beginning
+
+                    # TODO: If chunked upload not complete, return chunk confirmation
+                    # Else Move when complete
+                    if is_last or is_one_chunk:
+                        try:
+                            rename(
+                                join(
+                                    current_app.config["TEMP_DIR"],
+                                    session["session_csv"] + ".tmp",
+                                ),
+                                join(
+                                    current_app.config["UPLOAD_DIR"],
+                                    session["session_csv"],
+                                ),
+                            )
+                            session.pop('dzuuid', None) # Clear upload id
+                            return make_response(("File upload successful", 200))
+                        except OSError:
+                            # FIXME: Log error
+                            return make_response(
+                                (
+                                    "ERROR: Failed upload when saving, contact admin for help.",
+                                    500,
+                                )
+                            )
+
+                    # TODO: Move to it's own python file
+                    # Call function for database storage and DFTPL processing.
+                    # TODO: Handle passing analyzer list to dftpl
+                    # Loop to read and sanitize rows into dftpl timeline object
+                    # If no row, return error.
+                    # If a row with missing column is detected, notify user (which row) and cancel process (delete db, csv)
+                    # Else, notify that process succeeds and pass timeline object to dftpl
+
+                    return make_response(("Chunk upload successful", 200))
+
                 # sqlite
-                    # TEST: Simple test schema
                 elif file_type == "sqlite":
-                    # FIXME: Check if file already exists
                     # Check signature fir if it's even a valid sqlite db
                     # TODO: Prevent 2 files having same name by adding unix time to the name?
-                    file_signature = file.stream.read(16).hex()
-                    # Check if .read() return 'None'
-                    if (file_signature and (bytes.fromhex(file_signature) == bytes.fromhex(SQLITE_MAGIC_HEADER_HEX))):
-                        file.stream.seek(SEEK_SET) # Return to beginning of stream after reading the first 16 bytes
-                        # Save the file
-                        filename = token_hex(8) + secure_filename(file.filename) 
-                        file.save(join(current_app.config['UPLOAD_DIR'], filename))
+                    if is_first or is_one_chunk:
+                        try:
+                            file_signature = file.stream.read(16).hex()
+                        except (UnicodeDecodeError, OSError):
+                            return make_response(
+                                ("ERROR: Error while reading file stream.", 500)
+                            )
+                        except:
+                            return make_response(
+                                ("ERROR: Unknown error reading sqlite.", 400)
+                            )
+                        # Check if .read() return 'None'
+                        if file_signature != None and (
+                            bytes.fromhex(file_signature)
+                            == bytes.fromhex(SQLITE_MAGIC_HEADER_HEX)
+                        ):
+                            file.stream.seek(
+                                SEEK_SET
+                            )  # Return to beginning of stream after reading the first 16 bytes
+                            # Save the file
+                            # Assuming file is split into chunks, loop to get all the chunks
+                            filename = token_hex(8) + secure_filename(file.filename)
+                            session["session_db"] = filename  # To reuse later
+                        else:
+                            return make_response(("ERROR: Invalid sqlite file!", 400))
+
+                    # If header is valid, upload DB
+                    # TEST: Save chunk
+                    # Store to 'temp' folder with temporary extension
+                    try:
+                        with open(
+                            join(
+                                current_app.config["TEMP_DIR"],
+                                session["session_db"] + ".tmp",
+                            ),
+                            "ab",
+                        ) as f:
+                            f.seek(int(request.form["dzchunkbyteoffset"]))
+                            f.write(file.stream.read())
+                    except OSError as e:
+                        # TODO: Logging
+                        print(e)
+                        return make_response(
+                            ("ERROR: Error while writing to disk!", 500)
+                        )
+
+                    # Once DB is fully uploaded
+                    if is_last or is_one_chunk:
+                        rename(
+                            join(
+                                current_app.config["TEMP_DIR"],
+                                session["session_db"] + ".tmp",
+                            ),
+                            join(
+                                current_app.config["UPLOAD_DIR"], session["session_db"]
+                            ),
+                        )
                         # Generate database uri.
                         # Try to create an engine, a session, and open a connection for query
-                        database_uri = "sqlite:///" + join(current_app.config["UPLOAD_DIR"]  + '\\' + f"{filename}")
+                        database_uri = "sqlite:///" + join(
+                            current_app.config["UPLOAD_DIR"] + "\\" + f"{session["session_db"]}"
+                        )
                         engine = create_engine(database_uri)
-                        session['session_db'] = filename # To reuse later
-                        
+
                         # TODO: CATCH DB Corruptions
 
-                        db_session = scoped_session(sessionmaker(autocommit=False,
-                                                                autoflush=False,
-                                                                bind=engine))
+                        db_session = scoped_session(
+                            sessionmaker(autocommit=False, autoflush=False, bind=engine)
+                        )
                         # Run raw sql to get schema_table data
                         # schema_table isn't an actual table
                         # https://www.sqlite.org/schematab.html
                         query = """select sql\nfrom sqlite_master\nwhere type = "table"\norder by name"""
                         result = db_session.execute(text(query))
-                        
+
                         for index, row in enumerate(result):
-                            # TEST
                             if SCHEMA_TABLE_SQL_VAL[index] != row[0]:
                                 # Do these 3 to close DB connections
-                                result.close() # Close result proxy con
+                                result.close()  # Close result proxy con
                                 db_session.remove()
                                 engine.dispose()
                                 # Clean session values and false file
-                                remove(join(current_app.config['UPLOAD_DIR'], session.pop('session_db', None)))
-                                return {"message": "ERROR: Invalid sqlite file!"}
-
-
-
+                                remove(
+                                    join(
+                                        current_app.config["UPLOAD_DIR"],
+                                        session.pop("session_db", None),
+                                    )
+                                )
+                                return make_response(
+                                    ("ERROR: Invalid sqlite file!", 400)
+                                )
+                        session.pop('dzuuid', None) # Clear upload id
                         # Close session connection.
                         # NOTE: File will still be in use.
                         db_session.remove()
-                        return {"message": "Success upload"}
-                        
-                    else:
-                        # TODO: Handle invalid sqlite file
-                        return {"message": "ERROR: Invalid sqlite file!"}
+                        return make_response(("File upload successful", 200))
 
+                    return make_response(("Chunk upload successful", 200))
                 else:
-                    return {"message": "ERROR: Invalid file upload!"}
+                    return make_response(("ERROR: Invalid file!", 400))
             else:
-                return {"message": "ERROR: Invalid file upload!"}
-        except (RequestEntityTooLarge):
-            return {"message": "ERROR: File size too large!"}
+                return make_response(("ERROR: Invalid file!", 400))
+        except RequestEntityTooLarge:
+            return make_response(("ERROR: File size too large!", 400))
+    else:
+        return make_response(("ERROR: Invalid Upload Request!", 400))
+    return make_response(("ERROR: Unknown upload error encountered!", 500))
 
 
-@api.route('/uploads/<name>', methods=['GET'])
+@api.route("/uploads/<name>", methods=["GET"])
 # TODO: Add integrity hash check after file is downloaded, give user option to redo if corrupted.
-#TEST: Testing 
-#@login_required 
+# TEST: Testing
+# @login_required
 def download_file(name):
-    if request.method == 'GET':
+    if request.method == "GET":
         return send_from_directory(current_app.config["UPLOAD_DIR"], name)
-    
+
+
 #

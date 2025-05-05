@@ -1,24 +1,45 @@
 <!-- TODO: Add icons to buttons for accessibility -->
 <script setup>
 import { ref, onMounted } from 'vue'
-// Dropzone for chunked upload
-// Validation for file size and type is handled by Dropzone
-import { Dropzone } from "@deltablot/dropzone"
+
 
 const selected_analyzers = ref([])
 const analyzer_list = ref([])
 
-
-// Dropzone
-const dropzoneRef = ref() // Ref to component where dropzone is initialized
-var myDropzone = false // Dropzone can only be initialized AFTER mounted
+const file_value = ref()
 
 // Ref to vuetify form
 const myForm = ref();
 const is_upload = ref(false)
 const upload_progress = ref()
-
 // Client-side validation using vuetify array of rule functions
+
+// CONST: SERVER SIDE MAX FILE SIZE
+const file_rule = [
+  // The 'File' object will be automatically stored in an array.
+  // To access a single file upload directly, use the first member ([0])
+  // https://stackoverflow.com/questions/857618/javascript-how-to-extract-filename-from-a-file-input-control
+  value => {
+    if (!value || !value.length) {
+      return 'Field is required'
+    }
+    else {
+      if (!((value[0].name.indexOf('.') > -1) &&
+        value[0].name.split('.')[value[0].name.split('.').length - 1].toLowerCase() == "csv")) {
+        // If filename contains '.' and extension is ".csv"
+        return 'File extension must be .csv'
+      }
+      else if (value[0].size > (5 * 1073741824)) {
+        return 'File size must be less than 5 GB' //Max size
+      }
+      else {
+        return true
+      }
+    }
+
+  }
+]
+
 const analyzer_list_rule = [
   value => selected_analyzers.value.length > 0 || 'Please select at least 1 analyzers.', //required
 ]
@@ -41,62 +62,42 @@ async function load_analyzer_list() {
 
 function on_submit() {
   myForm.value?.validate().then(async ({ valid: isValid }) => {
-    if (isValid && myDropzone) {
-      // TODO: Prompt message if user haven't selected a file
-      console.log("GO!")
-      myDropzone.processQueue()
-      // TODO: Redirect to main
+    if (isValid) {
+      // Construct and send form data to API
+      const formData = new FormData()
+      formData.append('file', file_value.value)
+      formData.append('analyzers', selected_analyzers.value)
+      // TEST: XHR Request for upload
+      const xhr = new XMLHttpRequest()
+      xhr.open("POST", "/api/v1/upload")
+      // Calculates and logs upload progress
+      is_upload.value = true
+      xhr.upload.addEventListener("progress", (e) => {
+        const percent = e.lengthComputable ? (e.loaded / e.total) * 100 : 0
+        console.log(percent.toFixed(2))
+        upload_progress.value = percent.toFixed(2)
+      })
+
+      xhr.send(formData)
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState == XMLHttpRequest.DONE) {
+          // TEST: Assume redirect if success
+            alert(xhr.responseText);
+            is_upload.value = false
+            upload_progress.value = 0
+
+          
+        }
+      }
+      //TODO: Redirect to main
     }
   })
 }
 
 onMounted(async () => {
-  //TODO: Add loading screen/icon for analyzer data loading
+  //TODO: Add loading screen/icon for data loading
   await load_analyzer_list()
-  // Initialize Dropzone
-  myDropzone = new Dropzone(dropzoneRef.value, {
-    autoProcessQueue: false,
-    acceptedFiles: '.csv',
-    paramName: 'file',
-    chunking: true,// TODO: Implement chunking
-    forceChunking: true,
-    url: '/api/v1/upload',
-    maxFiles: 1,
-    maxFilesize: 5 * 1024, // in MiB
-    chunkSize: 10 * 1024 * 1024, // in B
-    // Custom messages
-    dictInvalidFileType: "File must be a plaso timeline with '.csv' output format."
-  })
-
-  // Clear selected file if another file is dropped
-  myDropzone.on("addedfile", function(file){
-    // If a new file is selected, remove the previous one
-    // Returns an array, so access the first item
-    if(myDropzone.getAcceptedFiles()[0]){
-      myDropzone.removeFile(myDropzone.getAcceptedFiles()[0])
-    }
-  })
-
-  // Display upload progress
-  myDropzone.on("uploadprogress", function(file, progress, bytesSent) {
-    upload_progress.value = progress.toFixed(2)
-  })
-
-  // Append selected analyzers value before sending to server
-  myDropzone.on("sending", function(file, xhr, formData){
-    formData.append('analyzers', selected_analyzers.value)
-    is_upload.value = true
-  })
-  // TODO: On upload failure, check if file validation failed or not
-    // Reset if failed
-  myDropzone.on("error", function(file, response){
-    is_upload.value = false
-  })
-
-  // TODO: Add option to cancel upload
-
 })
-
 
 </script>
 
@@ -111,7 +112,7 @@ onMounted(async () => {
       TODO: Analyzer search, select/deselect all, grouping, and integrate to actual submitable form.
       -->
       <!-- 'multipart/form-data' Since a file is being uploaded.-->
-       <!-- TEST DROPZONE -->
+
       <v-form ref="myForm" enctype="multipart/form-data" @submit.prevent="on_submit">
         <v-row>
           <v-container fluid>
@@ -119,8 +120,7 @@ onMounted(async () => {
             <v-input :rules="analyzer_list_rule">
               <v-virtual-scroll :height="300" :items="analyzer_list">
                 <template v-slot:default="{ item }">
-                  <!-- Prevent user from changing analyzer list while file is uploaded -->
-                  <v-checkbox v-model="selected_analyzers" :label="item['name']" :value="item['name']" :disabled="is_upload ? '' : disabled"></v-checkbox>
+                  <v-checkbox v-model="selected_analyzers" :label="item['name']" :value="item['name']"></v-checkbox>
                 </template>
               </v-virtual-scroll>
             </v-input>
@@ -128,13 +128,12 @@ onMounted(async () => {
             <p>{{ selected }}</p>
           </v-container>
         </v-row>
-        <div ref="dropzoneRef" class="dropzone">
+        <v-row>
           <v-col>
-            <!-- <v-file-input v-model="file_value" label="Upload a plaso timeline (default .csv output)" accept=".csv"
+            <v-file-input v-model="file_value" label="Upload a plaso timeline (default .csv output)" accept=".csv"
               :rules="file_rule" name=file>
 
-            </v-file-input> -->
-            
+            </v-file-input>
             <v-progress-linear v-if="is_upload" v-model="upload_progress" color="purple" height="25">
               <template v-slot:default="{ value }">
                 <strong>{{ Math.ceil(value) }}%</strong>
@@ -146,7 +145,7 @@ onMounted(async () => {
               Upload
             </v-btn>
           </v-col>
-        </div>
+        </v-row>
       </v-form>
     </v-col>
   </v-container>

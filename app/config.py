@@ -40,6 +40,9 @@ class Config(object):
 
     # File upload and download configs
     # TODO: Generate unique subfolder for each user
+    TEMP_DIR = os.path.join(APP_DIR, "temp")
+    if not os.path.exists(TEMP_DIR):
+        raise Exception("Temp folder not found: {}".format(TEMP_DIR))
     UPLOAD_DIR = os.path.join(APP_DIR, "projects")
     if not os.path.exists(UPLOAD_DIR):
         raise Exception("Upload folder not found: {}".format(UPLOAD_DIR))

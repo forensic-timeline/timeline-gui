@@ -18,6 +18,9 @@ from .config import Config
 app.logger.info('>>> {}'.format(Config.FLASK_ENV))
 app.template_folder = Config.DIST_DIR
 app.static_folder = Config.STATIC_DIR
+
+# TODO: Wipe "temp" folder contents possibly filled with partial failed uploads
+
 # Initializes other packages
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
