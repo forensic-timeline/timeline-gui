@@ -6,7 +6,7 @@ from faker import Faker
 
 # Generates test data for timeline
 
-# TODO: Add hyperlinks to each analyzer's documentation when that's implemented
+# TODO: Add hyperlinks to each analyser's documentation when that's implemented
 @api.route('/test-timeline-json', methods=['GET'])
 def get_test_timeline_json():
     fake = Faker()

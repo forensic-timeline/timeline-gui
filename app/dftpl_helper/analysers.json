@@ -1,0 +1,64 @@
+{
+    "analysers-list": [
+        {
+            "name": "File Downloaded",
+            "category": "User Activity"
+        },
+        {
+            "name": "Recent File Access",
+            "category": "User Activity"
+        },
+        {
+            "name": "USB Device Connected (Registry DeviceClasses)",
+            "category": "User Activity"
+        },
+        {
+            "name": "USB Device Connected (Registry USB)",
+            "category": "User Activity"
+        },
+        {
+            "name": "USB Device Connected (Registry USBSTOR)",
+            "category": "User Activity"
+        },
+        {
+            "name": "USB Device Connected (WinEvt)",
+            "category": "User Activity"
+        },
+        {
+            "name": "Windows Event Log Cleared",
+            "category": "User Activity"
+        },
+        {
+            "name": "Windows Firewall Disabled",
+            "category": "User Activity"
+        },
+        {
+            "name": "Cached Images",
+            "category": "Web"
+        },
+        {
+            "name": "Bing Search",
+            "category": "Web"
+        },
+        {
+            "name": "Google Search",
+            "category": "Web"
+        },
+        {
+            "name": "Web Visit",
+            "category": "Web Overview"
+        },
+        {
+            "name": "Windows Shutdown",
+            "category": "System"
+        },
+        {
+            "name": "Process Creation",
+            "category": "Windows"
+        },
+        {
+            "name": "Program Opened",
+            "category": "System"
+        }
+    ]
+}

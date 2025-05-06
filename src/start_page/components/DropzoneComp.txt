@@ -12,7 +12,7 @@ onMounted(() => {
     paramName: 'file',
     chunking: true,
     forceChunking: true,
-    url: '/api/v1/analyzers',
+    url: '/api/v1/analysers',
     maxFiles: 1,
     maxFilesize: 5 * 1024, // in MiB
     chunkSize: 10 * 1024 * 1024 // in B

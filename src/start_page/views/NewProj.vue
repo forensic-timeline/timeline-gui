@@ -7,8 +7,8 @@ import { Dropzone } from "@deltablot/dropzone"
 // Import component for getting hash of uploaded file
 import ConfirmIntegrity from '../components/ConfirmIntegrity.vue'
 
-const selected_analyzers = ref([])
-const analyzer_list = ref([])
+const selected_analysers = ref([])
+const analyser_list = ref([])
 
 
 // Dropzone
@@ -25,22 +25,22 @@ const upload_progress = ref()
 const confirmIntegrity = ref()
 
 // Client-side validation using vuetify array of rule functions
-const analyzer_list_rule = [
-  value => selected_analyzers.value.length > 0 || 'Please select at least 1 analyzers.', //required
+const analyser_list_rule = [
+  value => selected_analysers.value.length > 0 || 'Please select at least 1 analysers.', //required
 ]
 
-//Retrieves list of analyzers from server
-async function load_analyzer_list() {
+//Retrieves list of analysers from server
+async function load_analyser_list() {
 
   // Retrieve data from api
   const requestOptions = {
     method: "GET",
     headers: { "Content-Type": "application/json" },
   };
-  await fetch(`/api/v1/analyzers`, requestOptions)
+  await fetch(`/api/v1/analysers`, requestOptions)
     .then(response => response.json())
     .then(data => {
-      analyzer_list.value = data
+      analyser_list.value = data
     });
 
 }
@@ -56,8 +56,8 @@ function on_submit() {
 }
 
 onMounted(async () => {
-  //TODO: Add loading screen/icon for analyzer data loading
-  await load_analyzer_list()
+  //TODO: Add loading screen/icon for analyser data loading
+  await load_analyser_list()
   // Initialize Dropzone
   myDropzone = new Dropzone(dropzoneRef.value, {
     autoProcessQueue: false,
@@ -87,9 +87,9 @@ onMounted(async () => {
     upload_progress.value = progress.toFixed(2)
   })
 
-  // Append selected analyzers value before sending to server
+  // Append selected analysers value before sending to server
   myDropzone.on("sending", function (file, xhr, formData) {
-    formData.append('analyzers', selected_analyzers.value)
+    formData.append('analysers', selected_analysers.value)
     is_upload.value = true
   })
   // Show ConfirmIntegrity component
@@ -129,21 +129,21 @@ watchEffect(() => {
       <v-btn :to="{ name: 'start' }" variant="tonal">
         Back
       </v-btn>
-      <!-- Analyzer Select
+      <!-- analyser Select
           
-      TODO: Analyzer search, select/deselect all, grouping, and integrate to actual submitable form.
+      TODO: analyser search, select/deselect all, grouping, and integrate to actual submitable form.
       -->
       <!-- 'multipart/form-data' Since a file is being uploaded.-->
       <!-- TEST DROPZONE -->
       <v-form ref="myForm" enctype="multipart/form-data" @submit.prevent="on_submit">
         <v-row>
           <v-container fluid>
-            <!-- For displaying error value for analyzers -->
-            <v-input :rules="analyzer_list_rule">
-              <v-virtual-scroll :height="300" :items="analyzer_list">
+            <!-- For displaying error value for analysers -->
+            <v-input :rules="analyser_list_rule">
+              <v-virtual-scroll :height="300" :items="analyser_list">
                 <template v-slot:default="{ item }">
-                  <!-- Prevent user from changing analyzer list while file is uploaded -->
-                  <v-checkbox v-model="selected_analyzers" :label="item['name']" :value="item['name']"
+                  <!-- Prevent user from changing analyser list while file is uploaded -->
+                  <v-checkbox v-model="selected_analysers" :label="item['name']" :value="item['name']"
                     :disabled="is_upload ? '' : disabled"></v-checkbox>
                 </template>
               </v-virtual-scroll>

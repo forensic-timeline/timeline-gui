@@ -144,7 +144,7 @@ class HighLevelEvents(Base):
     date_time_max: Mapped[datetime.datetime]
     event_type: Mapped[str]
     description: Mapped[str]
-    category: Mapped[str] # Analyzer category
+    category: Mapped[str] # analyser category
     reasoning_description: Mapped[str]
     reasoning_reference: Mapped[str]
     test_event_type: Mapped[str]

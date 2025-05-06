@@ -59,7 +59,7 @@ onMounted(async () => {
     upload_progress.value = progress.toFixed(2)
   })
 
-  // Append selected analyzers value before sending to server
+  // Append selected analysers value before sending to server
   myDropzone.on("sending", function (file, xhr, formData) {
     is_upload.value = true
   })

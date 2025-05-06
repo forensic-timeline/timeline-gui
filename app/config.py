@@ -5,8 +5,6 @@ See `.flaskenv` for default settings.
 """
 
 import os, secrets
-from app import app
-
 
 class Config(object):
     # If not set fall back to production for safety
@@ -53,6 +51,3 @@ class Config(object):
     MAX_FILE_SIZE = (
         5 * 1073741824
     )  # TEST: 5 GB Temporary limit. Practical size 1 KB = 1024 B
-
-
-app.config.from_object("app.config.Config")

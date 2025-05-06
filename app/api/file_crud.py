@@ -143,10 +143,10 @@ def upload_file():
                 file_type = allowed_file(file.filename)
                 # csv
                 # Create the dftpl timeline object while validating
-                # Call dftpl program with the object + list of analyzer
+                # Call dftpl program with the object + list of analyser
                 # Just don't call dftpl if an error is caught
                 if file_type == "csv":
-                    print(request.form["analyzers"])
+                    print(request.form["analysers"])
                     # Checks for header structure
                     if is_first or is_one_chunk:
                         # Read csv file content
@@ -180,7 +180,7 @@ def upload_file():
                             file.stream.seek(
                                 SEEK_SET
                             )  # Return to beginning of stream after checking file content then save file.
-                            filename = token_hex(8) + secure_filename(
+                            filename = token_hex(16) + secure_filename(
                                 file.filename
                             )  # Since new upload request = new file hash name
                             # Store path to session to process csv and deleting afterwards
@@ -236,7 +236,7 @@ def upload_file():
 
                     # TODO: Move to it's own python file
                     # Call function for database storage and DFTPL processing.
-                    # TODO: Handle passing analyzer list to dftpl
+                    # TODO: Handle passing analyser list to dftpl
                     # Loop to read and sanitize rows into dftpl timeline object
                     # If no row, return error.
                     # If a row with missing column is detected, notify user (which row) and cancel process (delete db, csv)
@@ -269,7 +269,7 @@ def upload_file():
                             )  # Return to beginning of stream after reading the first 16 bytes
                             # Save the file
                             # Assuming file is split into chunks, loop to get all the chunks
-                            filename = token_hex(8) + secure_filename(file.filename)
+                            filename = token_hex(16) + secure_filename(file.filename)
                             session["session_db"] = filename  # To reuse later
                         else:
                             return make_response(("ERROR: Invalid sqlite file!", 400))
