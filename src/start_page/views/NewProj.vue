@@ -89,7 +89,7 @@ onMounted(async () => {
 
   // Append selected analysers value before sending to server
   myDropzone.on("sending", function (file, xhr, formData) {
-    formData.append('analysers', selected_analysers.value)
+    formData.append('analysers', JSON.stringify(selected_analysers.value))
     is_upload.value = true
   })
   // Show ConfirmIntegrity component

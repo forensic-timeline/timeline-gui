@@ -15,13 +15,13 @@ from sqlalchemy.orm import relationship
 SCHEMA_TABLE_SQL_VAL = [
     """CREATE TABLE high_level_events (
 	id INTEGER NOT NULL, 
-	date_time_min DATETIME NOT NULL, 
-	date_time_max DATETIME NOT NULL, 
+	date_time_min VARCHAR NOT NULL, 
+	date_time_max VARCHAR, 
 	event_type VARCHAR NOT NULL, 
 	description VARCHAR NOT NULL, 
 	category VARCHAR NOT NULL, 
 	reasoning_description VARCHAR NOT NULL, 
-	reasoning_reference VARCHAR NOT NULL, 
+	reasoning_reference VARCHAR, 
 	test_event_type VARCHAR NOT NULL, 
 	test_event_evidence VARCHAR NOT NULL, 
 	user_comments VARCHAR, 
@@ -58,8 +58,8 @@ SCHEMA_TABLE_SQL_VAL = [
 )""",
 """CREATE TABLE low_level_events (
 	id INTEGER NOT NULL, 
-	date_time_min DATETIME NOT NULL, 
-	date_time_max DATETIME NOT NULL, 
+	date_time_min VARCHAR NOT NULL, 
+	date_time_max VARCHAR, 
 	event_type VARCHAR NOT NULL, 
 	path VARCHAR NOT NULL, 
 	evidence VARCHAR NOT NULL, 
@@ -121,18 +121,19 @@ class LowLevelEvents(Base):
     __tablename__ = "low_level_events"
     id: Mapped[int] = mapped_column(primary_key=True)
     # One to one
-    high_level_events: Mapped["HighLevelEvents"] = relationship(back_populates="low_level_events")
+    high_level_event: Mapped["HighLevelEvents"] = relationship(back_populates="low_level_event")
     # Many to many, supporting evidences
     supporting_after: Mapped[Optional[List["HighLevelEvents"]]] = relationship(secondary=supporting_after_table, back_populates="supporting_after")
     supporting_before: Mapped[Optional[List["HighLevelEvents"]]] = relationship(secondary=supporting_before_table, back_populates="supporting_before")
-    date_time_min: Mapped[datetime.datetime]
-    date_time_max: Mapped[datetime.datetime]
+    # HACK: Handling '0000-00-00T00:00:00.000000+00:00' by storing raw string
+    date_time_min: Mapped[str]
+    date_time_max: Mapped[Optional[str]] # HACK: As of 06052025, date_time_max aren't used (always "None")
     event_type: Mapped[str]
     path: Mapped[str]
     evidence: Mapped[str]
     plugin: Mapped[str]
     provenance_raw_entry: Mapped[str]
-    keys: Mapped[Optional[str]] # TODO: Remove optional once low_level_event keys variable is used by dftpl
+    keys: Mapped[Optional[str]] # HACK: As of 06052025, keys aren't used (always "None")
     user_comments: Mapped[Optional[str]]
     # Many to many, labels
     labels: Mapped[Optional[List["Labels"]]] = relationship(secondary=labels_low_level_events_table, back_populates="low_level_events")
@@ -140,19 +141,20 @@ class LowLevelEvents(Base):
 class HighLevelEvents(Base):
     __tablename__ = "high_level_events"
     id: Mapped[int] = mapped_column(primary_key=True)
-    date_time_min: Mapped[datetime.datetime]
-    date_time_max: Mapped[datetime.datetime]
+    # HACK: Handling '0000-00-00T00:00:00.000000+00:00' by storing raw string
+    date_time_min: Mapped[str]
+    date_time_max: Mapped[Optional[str]]
     event_type: Mapped[str]
     description: Mapped[str]
     category: Mapped[str] # analyser category
     reasoning_description: Mapped[str]
-    reasoning_reference: Mapped[str]
+    reasoning_reference: Mapped[Optional[str]] # HACK: As of 06052025, some analysers doesn't have references
     test_event_type: Mapped[str]
     test_event_evidence: Mapped[str]
     user_comments: Mapped[Optional[str]]
     # One to one, which low level event this high level event belongs to
-    low_level_events_id: Mapped[int] = mapped_column(ForeignKey("low_level_events.id"))
-    low_level_events: Mapped["LowLevelEvents"] = relationship(back_populates="high_level_events", single_parent=True)
+    low_level_event_id: Mapped[int] = mapped_column(ForeignKey("low_level_events.id"))
+    low_level_event: Mapped["LowLevelEvents"] = relationship(back_populates="high_level_event", single_parent=True)
     # Many to many, supporting low level event evidences and labels
     supporting_after: Mapped[Optional[List["LowLevelEvents"]]] = relationship(secondary=supporting_after_table, back_populates="supporting_after")
     supporting_before: Mapped[Optional[List["LowLevelEvents"]]] = relationship(secondary=supporting_before_table, back_populates="supporting_before")

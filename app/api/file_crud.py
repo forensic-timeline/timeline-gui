@@ -1,5 +1,5 @@
 import csv
-
+from json import loads
 # TEST
 import logging
 from hashlib import sha256  # For getting file hash
@@ -146,7 +146,6 @@ def upload_file():
                 # Call dftpl program with the object + list of analyser
                 # Just don't call dftpl if an error is caught
                 if file_type == "csv":
-                    print(request.form["analysers"])
                     # Checks for header structure
                     if is_first or is_one_chunk:
                         # Read csv file content
@@ -185,6 +184,7 @@ def upload_file():
                             )  # Since new upload request = new file hash name
                             # Store path to session to process csv and deleting afterwards
                             session["session_csv"] = filename
+
                         else:
                             return make_response(("ERROR: Invalid csv file!", 400))
 
@@ -224,6 +224,8 @@ def upload_file():
                                 ),
                             )
                             session.pop("dzuuid", None)  # Clear upload id
+                            # Store list of analysers
+                            session["selected_analysers"] = loads(request.form["analysers"])
                             return make_response(("File upload successful", 200))
                         except OSError:
                             # FIXME: Log error

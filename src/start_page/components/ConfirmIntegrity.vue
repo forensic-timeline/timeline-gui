@@ -38,6 +38,28 @@ async function loadHash() {
         .then(data => file_hash.value  = data)
 }
 
+// TEST
+// Sends request for server to call dftpl
+// FIXME: Show message if no high level timeline
+async function callDftpl() {
+    // Sends form data to API
+
+    const requestOptions = {
+        method: "GET",
+    };
+
+    await fetch(`/api/v1/run-dftpl`, requestOptions)
+        .then(response => response)
+        .then(data => server_response.value  = data)
+    // TEST
+        if (server_response.value.status == 200){
+            alert("DB SUCCESS")
+        }
+        else{
+            alert(server_response.value.text())
+        }
+    
+}
 defineExpose({
     loadHash
 });
@@ -54,8 +76,9 @@ defineExpose({
         </v-card-text>
     </v-card>
     <!-- TODO: Redirect to main page -->
-    <v-btn variant="tonal" color="green">
-        Continue to main page
+     <!-- TEST -->
+    <v-btn @click="callDftpl" variant="tonal" color="green">
+        Process timeline
     </v-btn>
     <v-btn @click="cleanUp" variant="flat" color="red-lighten-3">
         Delete file and reupload

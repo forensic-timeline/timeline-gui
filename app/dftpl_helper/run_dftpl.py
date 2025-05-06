@@ -1,7 +1,8 @@
 # Functions to run DFTPL. Based on "dftpl.py" branch "python-analysers" (as of 03052025)
 from app import current_app
-from app.model.timeline_model import Base
-from json import dump # Dump to file
+import app.model.timeline_model as TLModel
+from json import dump  # Dump to file
+from datetime import datetime
 
 from secrets import token_hex  # Generate random file name
 from os.path import join
@@ -43,7 +44,7 @@ import dftpl.analyzers.windows.ProcessCreation as ProcessCreation
 import dftpl.analyzers.windows.ProgramOpened as ProgramOpened
 
 # Default analysers list, made a const for multiple functions
-DEFAULT_analyserS = {
+DEFAULT_analyser = {
     FileDownloads.description: FileDownloads,
     RecentFileAccess.description: RecentFileAccess,
     USBConnectedRegDeviceClasses.description: USBConnectedRegDeviceClasses,
@@ -67,16 +68,21 @@ DEFAULT_analyserS = {
 def generate_analysers_list():
     analyser_list = {"analysers-list": []}
     # TODO: Make a template class for all analysers
-    for analyser in DEFAULT_analyserS.values():
+    for analyser in DEFAULT_analyser.values():
         analyser_list["analysers-list"].append(
             {"name": analyser.description, "category": analyser.analyser_category}
         )
     try:
-        with open(join(current_app.config["APP_DIR"], "dftpl_helper", "analysers.json"), "w", encoding="utf-8") as f:
+        with open(
+            join(current_app.config["APP_DIR"], "dftpl_helper", "analysers.json"),
+            "w",
+            encoding="utf-8",
+        ) as f:
             dump(analyser_list, f, ensure_ascii=False, indent=4)
     except OSError:
         # HACK: LOGGING PLS
         print("ERROR: Writing analysers.json")
+
 
 # Create and store timeline data in sqlite db
 # User can change the default name when they download it
@@ -90,22 +96,97 @@ def store_timelines(low_timeline: LowLevelTimeline, high_timeline: HighLevelTime
             + token_hex(16)
             + ".sqlite"
         ),
-        echo=True,
     )
-    Base.metadata.create_all(engine)
+    TLModel.Base.metadata.create_all(engine)
     # Write both high level and low level timelines to db
     db_session = scoped_session(
         sessionmaker(autocommit=False, autoflush=False, bind=engine)
     )
 
     # Iterate over low level events and write to DB
-
+    count = 1
+    for event in low_timeline.events:
+         # insert every 10k entries, prevent large memory usage but keep speed shorter than individual commits
+        # Since dftpl id = index = which row as ordered in the csv file,
+        # "autoincrement" primary key will assign the same id
+        # as dftpl.
+        # Relationships will be added when adding high level events.
+        db_session.add(
+            TLModel.LowLevelEvents(
+                # HACK: Handling '0000-00-00T00:00:00.000000+00:00' by storing raw string
+                date_time_min=event.date_time_min,
+                date_time_max=event.date_time_max,
+                event_type=event.type,
+                path=event.path,
+                evidence=event.evidence,
+                plugin=event.plugin,
+                provenance_raw_entry=",".join(str(element) for element in event.provenance["raw_entry"]),
+                keys=event.keys,
+            )
+        )
+        count += 1
+        # Commit before adding high level events and relationships
+        if count >= 10000:
+            
+            print(f"Low level events: {count}")
+            count = 1
+            db_session.commit()
+    db_session.commit() # Commit remaining
+    # TEST
+    print("Lowlevelevents commited")
     # Iterate over high level events and write to DB
+    for event in high_timeline.events:
+        # Since dftpl id = index = which row as ordered in the csv file,
+        # "autoincrement" primary key will assign the same id
+        # as dftpl.
+        # Relationships will be added when adding high level events.
+        new_event = TLModel.HighLevelEvents(
+            # HACK: Handling '0000-00-00T00:00:00.000000+00:00' by storing raw string
+            date_time_min=event.date_time_min,
+            date_time_max=event.date_time_max,
+            event_type=event.type,
+            description=event.description,
+            category=event.category,
+            reasoning_description=event.trigger["description"],
+            reasoning_reference=event.trigger["references"],
+            test_event_type=event.trigger["test_event"]["type"],
+            test_event_evidence=event.trigger["test_event"]["evidence"],
+            # Below's code looks up the low level timeline object and assigns the relationship
+            low_level_event=db_session.query(TLModel.LowLevelEvents)
+            .filter(TLModel.LowLevelEvents.id == event.id)
+            .first(),  # HACK: Is there a faster way?
+        )
 
+        # Key values is stored separately
+        for key, value in event.keys.items():
+            new_event.keys.append(
+                TLModel.Keys(
+                    key_name=key,
+                    key_value=value,
+                )
+            )
+
+        # Add Many to Many relationship values
+        # HACK: Is there a faster way?
+        # Below's code looks up the low level timeline object and assigns the relationship
+        for event_dict in event.supporting["before"]:
+            new_event.supporting_before.append(
+                db_session.query(TLModel.LowLevelEvents)
+                .filter(TLModel.LowLevelEvents.id == event_dict["id"])
+                .first()
+            )
+        for event_dict in event.supporting["after"]:
+            new_event.supporting_after.append(
+                db_session.query(TLModel.LowLevelEvents)
+                .filter(TLModel.LowLevelEvents.id == event_dict["id"])
+                .first()
+            )
     # Save and close DB connection
+    db_session.commit()
+    print("Highlevelevents commited") # TEST
     db_session.remove()
     engine.dispose()
-
+    print("Done") # TEST
 
 # analysers_arr = List of names based on the analysers's description variable
 def run_dftpl(input_file_path: str, analysers_arr: list[str]):
@@ -125,9 +206,8 @@ def run_dftpl(input_file_path: str, analysers_arr: list[str]):
     selected_analysers = []
     for selected in analysers_arr:
         selected_analysers.append(
-            DEFAULT_analyserS.get(selected, DEFAULT_analyserS.values)
+            DEFAULT_analyser.get(selected)
         )
-
     # Run each search analyser
     for analyser in selected_analysers:
         print(f"Running {analyser.description} analyser ...")
@@ -140,5 +220,9 @@ def run_dftpl(input_file_path: str, analysers_arr: list[str]):
     merge_timelines = MergeHighLevelTimeline(high_timelines)
     merged_high_timelines = merge_timelines.merge()
 
+    # FIXME: If no high level timelines is detected, return early
+    if len(merged_high_timelines.events) < 1:
+        return -1
     # Writing to database
     store_timelines(low_timeline=low_timeline, high_timeline=merged_high_timelines)
+    return 0
