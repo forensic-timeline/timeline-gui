@@ -3,8 +3,7 @@ import {createRouter, createWebHashHistory} from 'vue-router'
 
 // SFCs
 import App from './App.vue'
-// import Observable from './views/Observable.vue'
-import JsTree from './views/JsTree.vue'
+import DetailedLowLevel from './views/DetailedLowLevel.vue'
 // Vuetify
 import 'vuetify/styles'
 import { createVuetify } from 'vuetify'
@@ -15,7 +14,9 @@ import "@fortawesome/fontawesome-free/css/all.css"; // Ensure your project is ca
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 
+
 const router = createRouter(
+  // TEST: Finalize routes later
   {
     history: createWebHashHistory(),
     routes: [
@@ -26,8 +27,8 @@ const router = createRouter(
       // },
       {
         path: '/',
-        name: 'jstree',
-        component: JsTree
+        name: 'detailed-low-level',
+        component: DetailedLowLevel
       }
     ]
   }

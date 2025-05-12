@@ -5,18 +5,22 @@ from json import dump  # Dump to file
 from datetime import datetime
 
 from secrets import token_hex  # Generate random file name
-from os.path import join
+from os.path import join # Construct path name
+# For database
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import scoped_session, sessionmaker
 
+# Accessing user's session values
 from flask import session
 
+# To run DFTPL
 from dftpl.reader.CSVReader import CSVReader
 from dftpl.timelines.LowLevelTimeline import LowLevelTimeline
 from dftpl.timelines.HighLevelTimeline import HighLevelTimeline, MergeHighLevelTimeline
 from dftpl.events.LowLevelEvent import LowLevelEvent
 from dftpl.events.HighLevelEvent import HighLevelEvent
 
+# TODO: ADD THE REST OF THE ANALYZERS
 # Import all dftpl analysers by default
 # Update the list of usable analysers to match dftpl
 # TEST: Only imported analysers needed for testing
@@ -225,4 +229,5 @@ def run_dftpl(input_file_path: str, analysers_arr: list[str]):
         return -1
     # Writing to database
     store_timelines(low_timeline=low_timeline, high_timeline=merged_high_timelines)
+    
     return 0

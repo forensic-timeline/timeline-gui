@@ -15,6 +15,7 @@
     "jquery": "^3.7.1",
     "jstree": "^3.3.17",
     "sortablejs": "^1.15.6",
+    "tabulator-tables": "^6.3.1",
     "vue": "^3.5.13",
     "vuetify": "^3.7.12"
   },

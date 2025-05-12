@@ -1,15 +1,22 @@
 import csv
-from json import loads
+
 # TEST
 import logging
 from hashlib import sha256  # For getting file hash
-from flask import make_response
-from os import SEEK_SET
-from os import remove, rename
-from os.path import join, getsize
+from json import loads
+from os import SEEK_SET, remove, rename
+from os.path import getsize, join
 from secrets import token_hex  # Generate random file name
 
-from flask import flash, redirect, request, send_from_directory, session, url_for
+from flask import (
+    flash,
+    make_response,
+    redirect,
+    request,
+    send_from_directory,
+    session,
+    url_for,
+)
 from flask_login import login_required
 
 # Following https://flask.palletsprojects.com/en/stable/patterns/sqlalchemy/#manual-object-relational-mapping

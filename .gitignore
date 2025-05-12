@@ -32,3 +32,4 @@ dist-ssr
 app/secrets/*
 app/projects/*
 app/temp/*
+test/*

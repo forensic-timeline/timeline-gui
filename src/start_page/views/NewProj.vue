@@ -144,7 +144,7 @@ watchEffect(() => {
                 <template v-slot:default="{ item }">
                   <!-- Prevent user from changing analyser list while file is uploaded -->
                   <v-checkbox v-model="selected_analysers" :label="item['name']" :value="item['name']"
-                    :disabled="is_upload ? '' : disabled"></v-checkbox>
+                    :disabled="is_upload == 1"></v-checkbox>
                 </template>
               </v-virtual-scroll>
             </v-input>
