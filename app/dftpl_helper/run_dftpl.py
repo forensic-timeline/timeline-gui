@@ -1,24 +1,8 @@
 # Functions to run DFTPL. Based on "dftpl.py" branch "python-analysers" (as of 03052025)
-from app import current_app
-import app.model.timeline_model as TLModel
-from json import dump  # Dump to file
 from datetime import datetime
-
+from json import dump  # Dump to file
+from os.path import join  # Construct path name
 from secrets import token_hex  # Generate random file name
-from os.path import join # Construct path name
-# For database
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import scoped_session, sessionmaker
-
-# Accessing user's session values
-from flask import session
-
-# To run DFTPL
-from dftpl.reader.CSVReader import CSVReader
-from dftpl.timelines.LowLevelTimeline import LowLevelTimeline
-from dftpl.timelines.HighLevelTimeline import HighLevelTimeline, MergeHighLevelTimeline
-from dftpl.events.LowLevelEvent import LowLevelEvent
-from dftpl.events.HighLevelEvent import HighLevelEvent
 
 # TODO: ADD THE REST OF THE ANALYZERS
 # Import all dftpl analysers by default
@@ -46,6 +30,25 @@ import dftpl.analyzers.web.WebVisits as WebVisits
 import dftpl.analyzers.windows.LastShutdown as LastShutdown
 import dftpl.analyzers.windows.ProcessCreation as ProcessCreation
 import dftpl.analyzers.windows.ProgramOpened as ProgramOpened
+from dftpl.events.HighLevelEvent import HighLevelEvent
+from dftpl.events.LowLevelEvent import LowLevelEvent
+
+# To run DFTPL
+from dftpl.reader.CSVReader import CSVReader
+from dftpl.timelines.HighLevelTimeline import HighLevelTimeline, MergeHighLevelTimeline
+from dftpl.timelines.LowLevelTimeline import LowLevelTimeline
+
+# Accessing user's session values
+from flask import session
+
+# For database
+from sqlalchemy import create_engine, text
+from sqlalchemy.event import listen
+from sqlalchemy.orm import scoped_session, sessionmaker
+
+import app.model.timeline_model as TLModel
+import app.model.fts5_model as fts5Model
+from app import current_app
 
 # Default analysers list, made a const for multiple functions
 DEFAULT_analyser = {
@@ -101,14 +104,23 @@ def store_timelines(low_timeline: LowLevelTimeline, high_timeline: HighLevelTime
             + ".sqlite"
         ),
     )
+
+    # TEST: Setup event of LowLevelEvents FTS5 creation
+    listen(TLModel.LowLevelEvents.__table__, 'after_create', fts5Model.CreateFtsTable(TLModel.LowLevelEvents))
+
     TLModel.Base.metadata.create_all(engine)
     # Write both high level and low level timelines to db
     db_session = scoped_session(
         sessionmaker(autocommit=False, autoflush=False, bind=engine)
     )
 
+    # TEST: Setup event of LowLevelEvents FTS5 creation
+    # listen(db_session, 'after_attach', fts5Model.attach_fts_low_level)
+    listen(TLModel.LowLevelEvents, 'after_insert', fts5Model.attach_fts_low_level)
+
     # Iterate over low level events and write to DB
     count = 1
+    progress_10k = 0
     for event in low_timeline.events:
          # insert every 10k entries, prevent large memory usage but keep speed shorter than individual commits
         # Since dftpl id = index = which row as ordered in the csv file,
@@ -131,8 +143,8 @@ def store_timelines(low_timeline: LowLevelTimeline, high_timeline: HighLevelTime
         count += 1
         # Commit before adding high level events and relationships
         if count >= 10000:
-            
-            print(f"Low level events: {count}")
+            progress_10k += 1
+            print(f"Low level events: {progress_10k * count}")
             count = 1
             db_session.commit()
     db_session.commit() # Commit remaining

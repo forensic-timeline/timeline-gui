@@ -41,6 +41,7 @@ async function loadHash() {
 // TEST
 // Sends request for server to call dftpl
 // FIXME: Show message if no high level timeline
+// TODO: Add loading screen with progress messages
 async function callDftpl() {
     // Sends form data to API
 

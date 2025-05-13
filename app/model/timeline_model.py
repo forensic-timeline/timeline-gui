@@ -1,5 +1,4 @@
 from typing import Optional, List
-import datetime
 
 from sqlalchemy import ForeignKey
 from sqlalchemy import Column
