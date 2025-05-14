@@ -5,9 +5,10 @@ from flask import current_app, make_response, request, session
 
 # Auth
 from flask_login import login_required
-from sqlalchemy import create_engine, engine, text  # Python objects for DB connections
+from sqlalchemy import create_engine, text  # Python objects for DB connections
 from sqlalchemy import select, func, and_, or_  # Methods for sql expressions
 from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy.dialects import sqlite # TEST
 
 import app.model.timeline_model as TLModel
 from app import current_app
@@ -15,7 +16,7 @@ from app.api import api
 
 AMOUNT_IN_PAGE = 1000  # Max events per page, 100k crashed tabulator
 PAGES_AROUND = 1  # Max pages before and after current
-IS_ASCENDING_VALUES = ["true", "false"]
+IS_ASCENDING_VALUES = {"true": "ASC", "false": "DESC"}
 # TODO: Automate column retrieval
 # MAKE SURE THE CLIENT SIDE MATCHES THESE VALUES
 # Stores all columns objects for ease of understanding + used for search and sort column
@@ -23,26 +24,29 @@ IS_ASCENDING_VALUES = ["true", "false"]
 TABLE_VALUES = {
     "low_level": {
         "model": TLModel.LowLevelEvents,
-        "columns": {
-            "id": TLModel.LowLevelEvents.id,
-            "date_time_min": TLModel.LowLevelEvents.date_time_min,
-            "event_type": TLModel.LowLevelEvents.event_type,
-            "path": TLModel.LowLevelEvents.path,
-            "evidence": TLModel.LowLevelEvents.evidence,
-            "plugin": TLModel.LowLevelEvents.plugin,
-        }
+        "columns": [
+            "id",
+            "date_time_min",
+            "date_time_max",
+            "event_type",
+            "path",
+            "evidence",
+            "plugin",
+            "provenance_raw_entry",
+        ],
     },
     "high_level": {
         "model": TLModel.HighLevelEvents,
-        "columns": {
-            "id": TLModel.HighLevelEvents.id,
-            "date_time_min": TLModel.HighLevelEvents.date_time_min,
-            "event_type": TLModel.HighLevelEvents.event_type,
-            "description": TLModel.HighLevelEvents.description,
-            "category": TLModel.HighLevelEvents.category,
-            "reasoning desc": TLModel.HighLevelEvents.reasoning_description,
-            "reasoning ref": TLModel.HighLevelEvents.reasoning_reference,
-        }
+        "columns": [
+            "id",
+            "date_time_min",
+            "date_time_max",
+            "event_type",
+            "description",
+            "category",
+            "reasoning desc",
+            "reasoning ref",
+        ],
     },
 }
 
@@ -61,65 +65,84 @@ def get_page_low_event(
     table_name: str,
     filter_include: list[str] = [],
     filter_exclude: list[str] = [],
-    sort_asc: bool = True,
+    sort_asc: str = "true",
     sort_column: str = "id",
-    cur_page: int = 1,
+    get_page: int = 1,
 ):
     # TEST: https://mysql.rjweb.org/doc.php/pagination
+    cur_page = 1 if get_page < 1 else get_page  # Check min page requested
     max_page = 1
     page_rows = []
     # FIXME: Check if code can handle modified db (missing ids, not ordered ids, missing values)
-    # Get max pages
+    # Define MATCH statement (if any is required)
     # NOTE: Pylint throws a "not callable" error but false positive
     # https://github.com/sqlalchemy/sqlalchemy/discussions/9202
-    queries = []
-    # TEST: Try 2 columns search
+    include_exclude = ""
+    column_filter = " ".join(TABLE_VALUES[table_name]["columns"])
+    parameters = {} # For binding parameters
+    # Generates MATCH statement with parameter tokens
+    # HACK: Hardcoded table name
+
     if len(filter_include) > 0:
-        print("Added include") # TEST
-        queries.append(
-            or_(
-                TABLE_VALUES[table_name]["columns"]["date_time_min"].in_(filter_include),
-                TABLE_VALUES[table_name]["columns"]["event_type"].in_(filter_include),
-            )
-        )
+        print("Added include")  # TEST
+        param_id = []
+        for index, word in enumerate(filter_include):
+            param_id.append(f'||:inc{index}') # Concatenate so arg bindings will work
+            parameters[f"inc{index}"] = f"\"{word}\"" # To escape characters like '$'
+        include_exclude = include_exclude + (f" AND {table_name}_events_idx.id IN "
+                                             f"(SELECT id FROM {table_name}_events_idx WHERE {table_name}_events_idx"
+                                             f" MATCH \'{{{column_filter}}} : \'{" ".join(param_id)})"
+                                             )
+
     if len(filter_exclude) > 0:
-        print("Added exclude") # TEST
-
-        queries.append(
-            or_(
-                TABLE_VALUES[table_name]["columns"]["date_time_min"].not_in(filter_exclude),
-                TABLE_VALUES[table_name]["columns"]["event_type"].not_in(filter_exclude),
-            )
-        )
-
-    stmt = (
-        select(func.count(TABLE_VALUES[table_name]["model"].id))
-        .filter(*queries)
-        .select_from(TABLE_VALUES[table_name]["model"])
-    )
-
+        print("Added exclude")  # TEST
+        param_id = []
+        for index, word in enumerate(filter_exclude):
+            param_id.append(f'||:exc{index}') # Concatenate so arg bindings will work
+            parameters[f"exc{index}"] = f"\"{word}\"" # To escape characters like '$'
+        include_exclude = include_exclude + (f" AND {table_name}_events_idx.id NOT IN "
+                                             f"(SELECT id FROM {table_name}_events_idx WHERE {table_name}_events_idx"
+                                             f" MATCH \'{{{column_filter}}} : \'{" ".join(param_id)})"
+                                            )
     
+    # If an include or exclude term existed, add match statement
+    # Get max pages
+    # HACK: So MATCH and id where statements can be appended conditionally
+    stmt = f"SELECT COUNT(id) FROM {table_name}_events_idx WHERE 1=1" 
 
+    if include_exclude != "":
+        stmt = f"{stmt} {include_exclude}"
+    print(text(stmt).compile(dialect=sqlite.dialect())) # TEST
     max_page = ceil(
-        float(db_session.scalars(stmt).first()) / float(AMOUNT_IN_PAGE)
+        float(db_session.scalars(text(stmt), parameters).first()) / float(AMOUNT_IN_PAGE)
     )  # Automatically closes result after getting value
 
-    # Create select and where statement before adding limit and id lookup
-    # TEST: Just grabbing page, no other operations
-    stmt_2 = select(TABLE_VALUES[table_name]["model"])
-    print(stmt_2.filter(*queries).limit(AMOUNT_IN_PAGE))
-    queries.append(TABLE_VALUES[table_name]["model"].id > (cur_page - 1) * AMOUNT_IN_PAGE)
+    cur_page = max_page if get_page > max_page else get_page  # Check max page requested
 
-    for row in db_session.scalars(stmt_2.filter(*queries).limit(AMOUNT_IN_PAGE)).all():
-        page_rows.append(
-            {c.name: str(getattr(row, c.name)) for c in row.__table__.columns}
-        )
+    # Create select and where statement before adding limit and id lookup
+    # HACK: So MATCH and id where statements can be appended conditionally
+    stmt_2 = f"SELECT * FROM {table_name}_events_idx WHERE 1=1"
+
+    if include_exclude != "":
+        stmt_2 = f"{stmt_2} {include_exclude}"
+
     # If first, sort by first then limit
+    if cur_page <= 1:
+        stmt_2 = f"{stmt_2} ORDER BY :sortcolumn ASC LIMIT {AMOUNT_IN_PAGE}"
+
 
     # else if last, sort by last then limit
-
+    elif cur_page >= max_page:
+        stmt_2 = f"{stmt_2} ORDER BY :sortcolumn DESC LIMIT {AMOUNT_IN_PAGE}"
     # else calculate id to start retrieving with limit
-
+    else:
+        stmt_2 = f"{stmt_2} AND id > :pagenum ORDER BY :sortcolumn {IS_ASCENDING_VALUES[sort_asc]} LIMIT {AMOUNT_IN_PAGE}"
+        parameters["pagenum"] = (cur_page - 1) * AMOUNT_IN_PAGE
+    parameters["sortcolumn"] = sort_column
+    for row in db_session.execute(text(stmt_2), parameters).all():
+        page_rows.append(
+            dict(row._mapping)
+        )
     # Return results
     return {"max_page": max_page, "page_rows": page_rows}
 
@@ -138,11 +161,11 @@ def load_timeline(event_type):
     database_uri = (
         "sqlite:///"
         + r"D:\Moving\Documents\Universitas - MatKul\PraTA_TA_LaporanKP\TA"
-        + r"\Proj\dftpl_gui_proj\test\timeline_2_example_short_12052025.sqlite"
+        + r"\Proj\dftpl_gui_proj\test\timeline_2_fts5_short_12052025.sqlite"
     )
     db_engine = create_engine(database_uri)
     db_session = scoped_session(
-        sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
+        sessionmaker(autocommit=False, autoflush=False, bind=db_engine, )
     )
     # FIXME: Do input validation against acceptable values, return invalid request if failed
     # FIXME: Catch ValueError
@@ -158,17 +181,18 @@ def load_timeline(event_type):
     if len(arg_include) >= MAX_KEYWORDS or len(arg_exclude) >= MAX_KEYWORDS:
         return make_response(f"ERROR: Too many keywords, MAX: {MAX_KEYWORDS}", 400)
     # Sanitize values by replacing invalid values with defaults
-    if arg_asc not in IS_ASCENDING_VALUES or arg_bycol not in list(
-        TABLE_VALUES[event_type]["columns"].keys()
+    if (
+        arg_asc not in list(IS_ASCENDING_VALUES.keys())
+        or arg_bycol not in TABLE_VALUES[event_type]["columns"]
+        or not isinstance(arg_cur_page, int)
     ):
         return make_response("ERROR: Invalid Request", 400)
     # Include and exclude strings doesn't need to be sanitized
     # since not using raw sql commands so handled by SQLAlchemy
-    print(f"Include: {arg_include}") # TEST
-    print(f"Exclude: {arg_exclude}") # TEST
+    print(f"Include: {arg_include}")  # TEST
+    print(f"Exclude: {arg_exclude}")  # TEST
 
     # Update valid values if needed
-
 
     page_data = get_page_low_event(
         db_session=db_session,
@@ -177,7 +201,7 @@ def load_timeline(event_type):
         filter_exclude=arg_exclude,
         sort_asc=arg_asc,
         sort_column=arg_bycol,
-        cur_page=arg_cur_page,
+        get_page=arg_cur_page,
     )
     # Close DB Connections
     # result.close()  # Close result proxy con

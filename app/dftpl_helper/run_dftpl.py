@@ -105,7 +105,6 @@ def store_timelines(low_timeline: LowLevelTimeline, high_timeline: HighLevelTime
         ),
     )
 
-    # TEST: Setup event of LowLevelEvents FTS5 creation
     listen(TLModel.LowLevelEvents.__table__, 'after_create', fts5Model.CreateFtsTable(TLModel.LowLevelEvents))
 
     TLModel.Base.metadata.create_all(engine)
@@ -114,8 +113,6 @@ def store_timelines(low_timeline: LowLevelTimeline, high_timeline: HighLevelTime
         sessionmaker(autocommit=False, autoflush=False, bind=engine)
     )
 
-    # TEST: Setup event of LowLevelEvents FTS5 creation
-    # listen(db_session, 'after_attach', fts5Model.attach_fts_low_level)
     listen(TLModel.LowLevelEvents, 'after_insert', fts5Model.attach_fts_low_level)
 
     # Iterate over low level events and write to DB

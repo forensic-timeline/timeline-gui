@@ -72,6 +72,7 @@ const page_data = ref()
 
 // Page information, changed by vuetify pagination component
 const current_page = ref(1)
+const page_values = ref([1])
 // HACK: Total page is retrieved by getting max 'id' from db each page change
 const total_page = ref(10) //Total page length
 // Max visible page for pagination, const value
@@ -104,16 +105,26 @@ async function retrieveData(curPage) {
                 if (res.status == 200) {
                     page_data.value = res.data["page_rows"]
                     total_page.value = res.data["max_page"]
+
+                    // Update "go to page" values
+                    page_values.value = [1] // Must at least have 1 page
+                    for (let i = 2; i <= total_page.value; i++){
+                        page_values.value.push(i)
+                    }
+                    
+
+                    // TODO: Handle server error
+
                 }
             }));
 
+    // TODO: Handle server error
     if (table != null) {
         
         await table.setData(page_data.value)
         is_loading.value = false
     }
-    // TODO: Handle error
-
+    
 }
 
 // onBeforeMount: Call retrieveData to get first page and max amount of page for pagination
@@ -147,11 +158,12 @@ async function on_submit() {
 
 <template>
     <h2> Current page: {{ current_page }}</h2>
-    <v-icon icon="mdi-abacus" /> <!-- TEST -->
+    <!-- Filter and sort submition -->
+    <!-- FIXME: Validate terms amount or display error from server and reenable -->
     <v-form @submit.prevent="on_submit">
         <h3> Search time, event type, source file path, evidence entry, or plugin. </h3>
         <v-text-field v-model="include_terms" label="Include terms (separated by space)" :disabled="is_loading == 1"></v-text-field>
-        <v-text-field v-model="exclude_terms_terms" label="Exclude terms (separated by space)" :disabled="is_loading == 1"></v-text-field>
+        <v-text-field v-model="exclude_terms" label="Exclude terms (separated by space)" :disabled="is_loading == 1"></v-text-field>
         <v-select v-model="is_ascending" label="Sort direction" :items="is_ascending_values" :disabled="is_loading == 1"></v-select>
         <v-select v-model="selected_column" label="Sort by column" :items="low_level_columns" :disabled="is_loading == 1"></v-select>
         <v-btn type="submit" class="mb-8" color="blue" size="large" variant="tonal" block :disabled="is_loading == 1">
@@ -159,6 +171,8 @@ async function on_submit() {
         </v-btn>
     </v-form>
     <!-- NOTE: Button icons must use mdi icons manually, empty by default -->
+     <!-- Page navigation -->
+    <v-select v-model="current_page" label="Go to page:" :items="page_values" :disabled="is_loading == 1" @update:modelValue="onPageChange"></v-select>
     <v-pagination v-model="current_page" :length="total_page" :total-visible="total_visible" show-first-last-page=true
         variant="outlined" next-icon="mdi-page-next" prev-icon="mdi-page-previous"
         @update:modelValue="onPageChange" :disabled="is_loading == 1"></v-pagination>
