@@ -2,6 +2,7 @@
 from datetime import datetime
 from json import dump  # Dump to file
 from os.path import join  # Construct path name
+from os import remove
 from secrets import token_hex  # Generate random file name
 
 # TODO: ADD THE REST OF THE ANALYZERS
@@ -93,6 +94,7 @@ def generate_analysers_list():
 
 # Create and store timeline data in sqlite db
 # User can change the default name when they download it
+# FIXME: Catch error
 def store_timelines(low_timeline: LowLevelTimeline, high_timeline: HighLevelTimeline):
     # Create DB using model
     engine = create_engine(
@@ -200,6 +202,7 @@ def store_timelines(low_timeline: LowLevelTimeline, high_timeline: HighLevelTime
     db_session.remove()
     engine.dispose()
     print("Done") # TEST
+    return 0
 
 # analysers_arr = List of names based on the analysers's description variable
 def run_dftpl(input_file_path: str, analysers_arr: list[str]):
@@ -237,6 +240,14 @@ def run_dftpl(input_file_path: str, analysers_arr: list[str]):
     if len(merged_high_timelines.events) < 1:
         return -1
     # Writing to database
-    store_timelines(low_timeline=low_timeline, high_timeline=merged_high_timelines)
-    
-    return 0
+    if store_timelines(low_timeline=low_timeline, high_timeline=merged_high_timelines) == 0:
+
+        # Delete csv file once done
+        # TODO: Split into separate function that can be imported for reusability
+        if "session_csv" in session:
+            remove(join(current_app.config['UPLOAD_DIR'], session.pop('session_csv', None)))
+            return 0
+        else:
+            return -1
+    else:
+        return -1

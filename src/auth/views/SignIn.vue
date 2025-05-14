@@ -6,7 +6,7 @@ import { ref } from 'vue'
 const temp_fetch_api = ref(null);
 async function on_submit(username, password) {
     // Sends form data to API
-
+    // FIXME: Change to formdata
     const requestOptions = {
         method: "POST",
         headers: { "Content-Type": "application/json" },

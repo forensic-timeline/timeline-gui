@@ -1,11 +1,13 @@
 <script setup>
 import { ref, useTemplateRef, onMounted } from 'vue'
 import { TabulatorFull as Tabulator } from 'tabulator-tables'; // NOTE: Around 420kb
+import UpdateComments from '../components/UpdateComments.vue';
 import "tabulator-tables/dist/css/tabulator.css"; //import Tabulator stylesheet
 
 // HTML References
 const data_table = useTemplateRef("data_table")
 let table = null // Tabulator object ref
+const comments_ref = useTemplateRef("comments_ref")
 
 const is_ascending_values = [{
     title: 'Ascending',
@@ -77,6 +79,10 @@ const page_values = ref([1])
 const total_page = ref(10) //Total page length
 // Max visible page for pagination, const value
 const total_visible = ref(5)
+// Selected row's data by tabulator
+const selected_row = ref(false)
+
+
 // retrieveData: Retrieve paginated data asynchronously
 // Uses GET, example like sciencedirect.com
 async function retrieveData(curPage) {
@@ -119,12 +125,18 @@ async function retrieveData(curPage) {
             }));
 
     // TODO: Handle server error
-    if (table != null) {
+    if (table instanceof Tabulator) {
         
         await table.setData(page_data.value)
         is_loading.value = false
     }
     
+}
+
+function toggleComments(){
+    if (table instanceof Tabulator){
+        comments_ref.value.toggle(selected_row.value['id'], selected_row.value['user_comments'] )
+    }
 }
 
 // onBeforeMount: Call retrieveData to get first page and max amount of page for pagination
@@ -134,8 +146,14 @@ onMounted(async () => {
         columns: tabulator_columns,
         data: page_data.value,
         minHeight: "10vh",
-        maxHeight: "50vh"
+        maxHeight: "50vh",
+        selectableRows:1,
     })
+    // To select a row
+    table.on("rowSelected", function(row){
+        selected_row.value = row.getData()
+    });
+    
     await retrieveData(1)
 
 })
@@ -150,7 +168,6 @@ async function onPageChange(event) {
 
 // Wait for button's submit event to resolve
 async function on_submit() {
-
     await retrieveData(current_page.value)
 
 }
@@ -173,9 +190,13 @@ async function on_submit() {
     <!-- NOTE: Button icons must use mdi icons manually, empty by default -->
      <!-- Page navigation -->
     <v-select v-model="current_page" label="Go to page:" :items="page_values" :disabled="is_loading == 1" @update:modelValue="onPageChange"></v-select>
+    <!-- Elements for comment editing -->
+    <v-btn @click="toggleComments" :disabled="selected_row == 0"> Edit Comment </v-btn>
+    <UpdateComments @CloseWindow="on_submit" EventType="low_level" ref="comments_ref"></UpdateComments>
+
     <v-pagination v-model="current_page" :length="total_page" :total-visible="total_visible" show-first-last-page=true
         variant="outlined" next-icon="mdi-page-next" prev-icon="mdi-page-previous"
-        @update:modelValue="onPageChange" :disabled="is_loading == 1"></v-pagination>
+        @update:modelValue="on_submit" :disabled="is_loading == 1"></v-pagination>
     <!-- TODO: Loading bar for data -->
     <div>
         <v-progress-circular v-if="is_loading" color="primary" indeterminate></v-progress-circular>

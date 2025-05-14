@@ -38,7 +38,7 @@ def call_run_dftpl():
         ),
         session["selected_analysers"]
     ) < 0:
-        return make_response("Sorry, no high level events is found.", 400)
+        return make_response("ERROR: Failed to generate or to save timeline file.", 400)
     # FIXME: Catch return if no high level timeline, show message
     # TODO: Delete csv if database is created successfuly
     return make_response("", 200)

@@ -82,7 +82,7 @@ def get_page_low_event(
     parameters = {} # For binding parameters
     # Generates MATCH statement with parameter tokens
     # HACK: Hardcoded table name
-
+    # FIXME: Escape characters such as '%' in sqlite
     if len(filter_include) > 0:
         print("Added include")  # TEST
         param_id = []
@@ -220,7 +220,9 @@ def load_timeline(event_type):
 # Rename old label
 
 # Comment APIs
-# Create new
 # Edit
-# Delete
-# Retrieve
+@api.route("/timeline/<string:event_type>/u_comments", methods=["POST"])
+# @login_required
+# TEST: Add auth later
+def update_comments(event_type):
+    return make_response(request.form, 200) # TEST

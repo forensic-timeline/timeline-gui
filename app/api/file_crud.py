@@ -195,7 +195,6 @@ def upload_file():
                         else:
                             return make_response(("ERROR: Invalid csv file!", 400))
 
-                    # TEST: Save chunk
                     # Store to 'temp' folder with temporary extension
                     try:
                         with open(
@@ -371,15 +370,20 @@ def upload_file():
 
 
 # Generates a SHA256 hash to help user confirm uploaded file's integrity
-@api.route("/upload/confirm-hash", methods=["GET"])
+@api.route("/confirm-hash/<string:operation>", methods=["GET"])
 @login_required
-def confirm_hash():
+def confirm_hash(operation):
     if "session_csv" in session or "session_db" in session:
-        file_name = (
-            session["session_csv"]
-            if "session_csv" in session
-            else session["session_db"]
-        )
+        if operation == "upload":
+            file_name = (
+                session["session_csv"]
+                if "session_csv" in session
+                else session["session_db"]
+            )
+        elif operation == "download":
+            file_name = session["session_db"]
+        else:
+            return make_response("", 400)
         if request.method == "GET":
             try:
                 h_sha256 = sha256()
@@ -415,13 +419,13 @@ def undo_upload():
         return make_response("", 200)
 
 
-@api.route("/uploads/<name>", methods=["GET"])
+@api.route("/download_db", methods=["GET"])
 # TODO: Add integrity hash check after file is downloaded, give user option to redo if corrupted.
 # TEST: Testing
 # @login_required
-def download_file(name):
+def download_file():
     if request.method == "GET":
-        return send_from_directory(current_app.config["UPLOAD_DIR"], name)
+        return send_from_directory(current_app.config["UPLOAD_DIR"], session['session_db'])
 
 
 #

@@ -33,7 +33,7 @@ async function loadHash() {
         method: "GET",
     };
 
-    await fetch(`/api/v1/upload/confirm-hash`, requestOptions)
+    await fetch(`/api/v1/confirm-hash/upload`, requestOptions)
         .then(response => response.text())
         .then(data => file_hash.value  = data)
 }
