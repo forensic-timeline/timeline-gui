@@ -10,7 +10,7 @@ const IsActive = ref(false)
 const CommentValue = ref("")
 
 // Character limit rules
-const rules = [v => v ? v.length <= 200 : 0 || 'Max 200 characters']
+const rules = [v => v ? v.length <= 200 : true || 'Max 200 characters']
 
 function toggle(Id, Comment){
     RowId.value = Id
@@ -20,7 +20,6 @@ function toggle(Id, Comment){
 
 // Call to load 
 async function updateComments() {
-    console.log(CommentValue.value) // TEST
     // Sends form data to API
     let form = new FormData()
     form.append('row_id', RowId.value)
@@ -30,14 +29,13 @@ async function updateComments() {
         body: form
     };
     await fetch('/api/v1/timeline/' + EventType + '/u_comments', requestOptions)
-        .then(response => response.json()
+        .then(response => response.text()
             .then(data => ({
                 data: data,
                 status: response.status
             }))
             .then(res => {
                 if (res.status == 200) {
-                    console.log(res.data) // TEST
                 }
                 else {
                     // TODO: Handle server error

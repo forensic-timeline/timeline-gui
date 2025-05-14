@@ -9,6 +9,8 @@ from sqlalchemy import create_engine, text  # Python objects for DB connections
 from sqlalchemy import select, func, and_, or_  # Methods for sql expressions
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.dialects import sqlite # TEST
+from sqlalchemy.exc import DBAPIError
+
 
 import app.model.timeline_model as TLModel
 from app import current_app
@@ -112,7 +114,6 @@ def get_page_low_event(
 
     if include_exclude != "":
         stmt = f"{stmt} {include_exclude}"
-    print(text(stmt).compile(dialect=sqlite.dialect())) # TEST
     max_page = ceil(
         float(db_session.scalars(text(stmt), parameters).first()) / float(AMOUNT_IN_PAGE)
     )  # Automatically closes result after getting value
@@ -225,4 +226,38 @@ def load_timeline(event_type):
 # @login_required
 # TEST: Add auth later
 def update_comments(event_type):
-    return make_response(request.form, 200) # TEST
+    if event_type in ["low_level", "high_level"] and "row_id" in request.form and "comment" in request.form:
+        # TODO: Replace with user's database session info
+        # TEST: Use test db to avoid processing with dftpl each test
+        database_uri = (
+            "sqlite:///"
+            + r"D:\Moving\Documents\Universitas - MatKul\PraTA_TA_LaporanKP\TA"
+            + r"\Proj\dftpl_gui_proj\test\timeline_2_fts5_short_12052025.sqlite"
+        )
+        db_engine = create_engine(database_uri, echo=True)
+        db_session = scoped_session(
+            sessionmaker(autocommit=False, autoflush=False, bind=db_engine, )
+        )
+
+        # Try to update, catch errors (like out of bounds error)
+        # HACK: Hardcoded table name
+        try:
+            stmt = (f"UPDATE {event_type}_events " +
+                    f"SET user_comments = :c " +
+                    f"WHERE {event_type}_events.id = :s") # Updates main table
+            stmt2 = (f"UPDATE {event_type}_events_idx " +
+                    f"SET user_comments = :c " +
+                    f"WHERE {event_type}_events_idx.id = :s")# Updates fts5 table
+            
+            db_session.execute(text(stmt), {"c": request.form["comment"], "s": request.form["row_id"]})
+            db_session.execute(text(stmt2), {"c": request.form["comment"], "s": request.form["row_id"]})
+            db_session.commit()
+        except DBAPIError as e:
+            return make_response("ERROR: Database engine error", 500)
+        # Close DB Connections
+        # result.close()  # Close result proxy con
+        db_session.remove()
+        db_engine.dispose()
+        return make_response("", 200)
+    else:
+        return make_response("", 400)

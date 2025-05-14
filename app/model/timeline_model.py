@@ -135,6 +135,7 @@ class LowLevelEvents(Base):
     keys: Mapped[Optional[str]] # HACK: As of 06052025, keys aren't used (always "None")
     user_comments: Mapped[Optional[str]]
     # Many to many, labels
+    # FIXME: Cascade deleted labels
     labels: Mapped[Optional[List["Labels"]]] = relationship(secondary=labels_low_level_events_table, back_populates="low_level_events")
 
 class HighLevelEvents(Base):
@@ -157,10 +158,12 @@ class HighLevelEvents(Base):
     # Many to many, supporting low level event evidences and labels
     supporting_after: Mapped[Optional[List["LowLevelEvents"]]] = relationship(secondary=supporting_after_table, back_populates="supporting_after")
     supporting_before: Mapped[Optional[List["LowLevelEvents"]]] = relationship(secondary=supporting_before_table, back_populates="supporting_before")
+    # FIXME: Cascade deleted labels
     labels: Mapped[Optional[List["Labels"]]] = relationship(secondary=labels_high_level_events_table, back_populates="high_level_events")
     # One to many, key values stored separately
     keys: Mapped[Optional[List["Keys"]]] = relationship(back_populates="high_level_events")
 
+# FIXME: Cascade deleted labels
 class Labels(Base):
     __tablename__ = "labels"
     id: Mapped[int] = mapped_column(primary_key=True)
