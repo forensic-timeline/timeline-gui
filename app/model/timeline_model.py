@@ -1,6 +1,7 @@
 from typing import Optional, List
 
 from sqlalchemy import ForeignKey
+from sqlalchemy import String
 from sqlalchemy import Column
 from sqlalchemy import Table
 from sqlalchemy.orm import DeclarativeBase
@@ -167,7 +168,8 @@ class HighLevelEvents(Base):
 class Labels(Base):
     __tablename__ = "labels"
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str]
+    # Prevent confusion from duplicate labels
+    name: Mapped[str] = mapped_column(String(), unique=True)
     # Many to many
     low_level_events: Mapped[Optional[List["LowLevelEvents"]]] = relationship(secondary=labels_low_level_events_table, back_populates="labels")
     high_level_events: Mapped[Optional[List["HighLevelEvents"]]] = relationship(secondary=labels_high_level_events_table, back_populates="labels")
