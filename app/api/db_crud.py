@@ -227,6 +227,8 @@ def load_timeline(event_type):
 # TEST: Add auth later
 def update_comments(event_type):
     if event_type in ["low_level", "high_level"] and "row_id" in request.form and "comment" in request.form:
+        if len(request.form["comment"]) > 200:
+            return make_response("", 400)
         # TODO: Replace with user's database session info
         # TEST: Use test db to avoid processing with dftpl each test
         database_uri = (

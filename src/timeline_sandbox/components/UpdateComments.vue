@@ -12,7 +12,7 @@ const CommentValue = ref("")
 // Character limit rules
 const rules = [v => v ? v.length <= 200 : true || 'Max 200 characters']
 
-function toggle(Id, Comment){
+function toggle(Id, Comment) {
     RowId.value = Id
     IsActive.value = true
     CommentValue.value = Comment ? Comment : ""
@@ -52,19 +52,20 @@ defineExpose({
 </script>
 
 <template>
-    <v-overlay v-model="IsActive">
-        <v-form @submit.prevent="updateComments">
-            <h3> Editing event id:{{ RowId }} </h3>
-            <v-textarea v-model="CommentValue" label="Edit Comments" clear-icon="mdi-close-circle" clearable
-                :rules="rules" counter no-resize>
-            </v-textarea>
-            <v-btn type="submit" class="mb-8" color="blue" size="large" variant="tonal" block>
-                Update comments
-            </v-btn>
-            <v-btn @click="IsActive = false" class="mb-8" color="yellow" size="large" variant="tonal" block>
-                Cancel
-            </v-btn>
-        </v-form>
-    </v-overlay>
+    <v-dialog v-model="IsActive" width="auto">
+        <v-card max-width="500" :title="'Editing comment for event id: ' + RowId ">
+            <v-form @submit.prevent="updateComments">
+                <v-textarea v-model="CommentValue" label="Edit Comments" clear-icon="mdi-close-circle" clearable
+                    :rules="rules" counter no-resize>
+                </v-textarea>
+                <v-btn type="submit" class="mb-8" color="blue" size="large" variant="tonal" block>
+                    Update comments
+                </v-btn>
+                <v-btn @click="IsActive = false" class="mb-8" color="yellow" size="large" variant="tonal" block>
+                    Cancel
+                </v-btn>
+            </v-form>
+        </v-card>
+    </v-dialog>
 
 </template>
