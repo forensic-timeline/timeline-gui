@@ -2,12 +2,14 @@
 import { ref, useTemplateRef, onMounted } from 'vue'
 import { TabulatorFull as Tabulator } from 'tabulator-tables'; // NOTE: Around 420kb
 import UpdateComments from '../components/UpdateComments.vue';
+import CRUDLabels from '../components/CRUDLabels.vue';
 import "tabulator-tables/dist/css/tabulator.css"; //import Tabulator stylesheet
 
 // HTML References
 const data_table = useTemplateRef("data_table")
 let table = null // Tabulator object ref
 const comments_ref = useTemplateRef("comments_ref")
+const labels_ref = useTemplateRef("labels_ref")
 
 const is_ascending_values = [{
     title: 'Ascending',
@@ -47,6 +49,7 @@ const low_level_columns = [
     },
 ]
 // MAKE SURE DB SCHEMA MATCHES THE COLUMNS
+// TODO: Display label names too
 const tabulator_columns = [
     { title: "ID", field: "id", sorter: "number", },
     { title: "Time (Min)", field: "date_time_min", sorter: "string", },
@@ -114,10 +117,10 @@ async function retrieveData(curPage) {
 
                     // Update "go to page" values
                     page_values.value = [1] // Must at least have 1 page
-                    for (let i = 2; i <= total_page.value; i++){
+                    for (let i = 2; i <= total_page.value; i++) {
                         page_values.value.push(i)
                     }
-                    
+
 
                     // TODO: Handle server error
 
@@ -126,16 +129,23 @@ async function retrieveData(curPage) {
 
     // TODO: Handle server error
     if (table instanceof Tabulator) {
-        
+
         await table.setData(page_data.value)
         is_loading.value = false
     }
-    
+
 }
 
-function toggleComments(){
-    if (table instanceof Tabulator){
-        comments_ref.value.toggle(selected_row.value['id'], selected_row.value['user_comments'] )
+function toggleComments() {
+    if (table instanceof Tabulator) {
+        comments_ref.value.toggle(selected_row.value['id'], selected_row.value['user_comments'])
+    }
+}
+
+function toggleLabels() {
+    if (table instanceof Tabulator) {
+        // TEST
+        labels_ref.value.toggle(selected_row.value['id'], null)
     }
 }
 
@@ -147,13 +157,13 @@ onMounted(async () => {
         data: page_data.value,
         minHeight: "10vh",
         maxHeight: "50vh",
-        selectableRows:1,
+        selectableRows: 1,
     })
     // To select a row
-    table.on("rowSelected", function(row){
+    table.on("rowSelected", function (row) {
         selected_row.value = row.getData()
     });
-    
+
     await retrieveData(1)
 
 })
@@ -179,24 +189,36 @@ async function on_submit() {
     <!-- FIXME: Validate terms amount or display error from server and reenable -->
     <v-form @submit.prevent="on_submit">
         <h3> Search time, event type, source file path, evidence entry, or plugin. </h3>
-        <v-text-field v-model="include_terms" label="Include terms (separated by space)" :disabled="is_loading == 1"></v-text-field>
-        <v-text-field v-model="exclude_terms" label="Exclude terms (separated by space)" :disabled="is_loading == 1"></v-text-field>
-        <v-select v-model="is_ascending" label="Sort direction" :items="is_ascending_values" :disabled="is_loading == 1"></v-select>
-        <v-select v-model="selected_column" label="Sort by column" :items="low_level_columns" :disabled="is_loading == 1"></v-select>
+        <v-text-field v-model="include_terms" label="Include terms (separated by space)"
+            :disabled="is_loading == 1"></v-text-field>
+        <v-text-field v-model="exclude_terms" label="Exclude terms (separated by space)"
+            :disabled="is_loading == 1"></v-text-field>
+        <v-select v-model="is_ascending" label="Sort direction" :items="is_ascending_values"
+            :disabled="is_loading == 1"></v-select>
+        <v-select v-model="selected_column" label="Sort by column" :items="low_level_columns"
+            :disabled="is_loading == 1"></v-select>
         <v-btn type="submit" class="mb-8" color="blue" size="large" variant="tonal" block :disabled="is_loading == 1">
             Search
         </v-btn>
     </v-form>
     <!-- NOTE: Button icons must use mdi icons manually, empty by default -->
-     <!-- Page navigation -->
-    <v-select v-model="current_page" label="Go to page:" :items="page_values" :disabled="is_loading == 1" @update:modelValue="onPageChange"></v-select>
+    <!-- Page navigation -->
+    <v-select v-model="current_page" label="Go to page:" :items="page_values" :disabled="is_loading == 1"
+        @update:modelValue="onPageChange"></v-select>
     <!-- Elements for comment editing -->
-    <v-btn @click="toggleComments" :disabled="selected_row == 0"> Edit Comment </v-btn>
-    <UpdateComments @CloseWindow="on_submit" EventType="low_level" ref="comments_ref"></UpdateComments>
+    <v-row>
+        <v-btn @click="toggleComments" :disabled="selected_row == 0"> Edit Comment </v-btn>
+        <UpdateComments @CloseWindow="on_submit" eventType="low_level" ref="comments_ref"></UpdateComments>
+        <!-- Elements for label editing -->
+         
+        <v-btn @click="toggleLabels" :disabled="selected_row == 0"> Edit Labels </v-btn>
+        <CRUDLabels @CloseWindow="on_submit" eventType="low_level" ref="labels_ref"></CRUDLabels>
+
+    </v-row>
 
     <v-pagination v-model="current_page" :length="total_page" :total-visible="total_visible" show-first-last-page=true
-        variant="outlined" next-icon="mdi-page-next" prev-icon="mdi-page-previous"
-        @update:modelValue="on_submit" :disabled="is_loading == 1"></v-pagination>
+        variant="outlined" next-icon="mdi-page-next" prev-icon="mdi-page-previous" @update:modelValue="on_submit"
+        :disabled="is_loading == 1"></v-pagination>
     <!-- TODO: Loading bar for data -->
     <div>
         <v-progress-circular v-if="is_loading" color="primary" indeterminate></v-progress-circular>

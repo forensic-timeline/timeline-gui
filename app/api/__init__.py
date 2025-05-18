@@ -6,3 +6,5 @@ api = Blueprint('api', __name__)
 
 # Import all api files
 from app.api import auth, file_crud, tokens, errors, fake_data, dftpl_api, db_crud
+# TEST: Import database api files
+from app.api.database import label_crud

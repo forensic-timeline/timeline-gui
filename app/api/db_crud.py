@@ -180,6 +180,8 @@ def load_timeline(event_type):
     arg_cur_page = request.args.get("curPage", default=1, type=int)
     # Limit number of include and exclude to MAX_KEYWORDS strings
     if len(arg_include) >= MAX_KEYWORDS or len(arg_exclude) >= MAX_KEYWORDS:
+        db_session.remove()
+        db_engine.dispose()
         return make_response(f"ERROR: Too many keywords, MAX: {MAX_KEYWORDS}", 400)
     # Sanitize values by replacing invalid values with defaults
     if (
@@ -187,6 +189,8 @@ def load_timeline(event_type):
         or arg_bycol not in TABLE_VALUES[event_type]["columns"]
         or not isinstance(arg_cur_page, int)
     ):
+        db_session.remove()
+        db_engine.dispose()
         return make_response("ERROR: Invalid Request", 400)
     # Include and exclude strings doesn't need to be sanitized
     # since not using raw sql commands so handled by SQLAlchemy
@@ -236,7 +240,7 @@ def update_comments(event_type):
             + r"D:\Moving\Documents\Universitas - MatKul\PraTA_TA_LaporanKP\TA"
             + r"\Proj\dftpl_gui_proj\test\timeline_2_fts5_short_12052025.sqlite"
         )
-        db_engine = create_engine(database_uri, echo=True)
+        db_engine = create_engine(database_uri)
         db_session = scoped_session(
             sessionmaker(autocommit=False, autoflush=False, bind=db_engine, )
         )
@@ -255,6 +259,8 @@ def update_comments(event_type):
             db_session.execute(text(stmt2), {"c": request.form["comment"], "s": request.form["row_id"]})
             db_session.commit()
         except DBAPIError as e:
+            db_session.remove()
+            db_engine.dispose()
             return make_response("ERROR: Database engine error", 500)
         # Close DB Connections
         # result.close()  # Close result proxy con
