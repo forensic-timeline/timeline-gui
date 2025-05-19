@@ -50,6 +50,7 @@ const low_level_columns = [
 ]
 // MAKE SURE DB SCHEMA MATCHES THE COLUMNS
 // TODO: Display label names too
+// FIXME: Limit/wrap certain columns for ease of comparing multiple rows
 const tabulator_columns = [
     { title: "ID", field: "id", sorter: "number", },
     { title: "Time (Min)", field: "date_time_min", sorter: "string", },
@@ -61,6 +62,11 @@ const tabulator_columns = [
     { title: "Provenence Raw Entry", field: "provenence_raw_entry", sorter: "string", },
     { title: "Keys", field: "keys", sorter: "string", },
     { title: "User Comments", field: "user_comments", sorter: "string", },
+    {
+        title: "Labels", field: "cname", formatter: "array", formatterParams: {
+            delimiter: "|", //join values using the "|" delimiter
+        }, headerSort: false
+    }
 ]
 
 // Values to send to API
@@ -88,8 +94,10 @@ const selected_row = ref(false)
 
 // retrieveData: Retrieve paginated data asynchronously
 // Uses GET, example like sciencedirect.com
+// TODO: Filter by date and time range
 async function retrieveData(curPage) {
     is_loading.value = true
+    selected_row.value = false // Clear selected column
     const requestOptions = {
         method: "GET",
         headers: { "Content-Type": "application/json" },
@@ -144,8 +152,8 @@ function toggleComments() {
 
 function toggleLabels() {
     if (table instanceof Tabulator) {
-        // TEST
-        labels_ref.value.toggle(selected_row.value['id'], null)
+        // cid: List of label id's
+        labels_ref.value.toggle(selected_row.value['id'], selected_row.value['cid'])
     }
 }
 
@@ -162,6 +170,13 @@ onMounted(async () => {
     // To select a row
     table.on("rowSelected", function (row) {
         selected_row.value = row.getData()
+    });
+    // When no row is selected, so the buttons are disabled
+    table.on("rowDeselected", function(row){
+    //row - row component for the deselected row
+        if(selected_row.value == row.getData()){
+            selected_row.value = false
+        }
     });
 
     await retrieveData(1)
@@ -189,6 +204,7 @@ async function on_submit() {
     <!-- FIXME: Validate terms amount or display error from server and reenable -->
     <v-form @submit.prevent="on_submit">
         <h3> Search time, event type, source file path, evidence entry, or plugin. </h3>
+        <h2> NOTE: Use whole words for searching </h2>
         <v-text-field v-model="include_terms" label="Include terms (separated by space)"
             :disabled="is_loading == 1"></v-text-field>
         <v-text-field v-model="exclude_terms" label="Exclude terms (separated by space)"
@@ -200,18 +216,20 @@ async function on_submit() {
         <v-btn type="submit" class="mb-8" color="blue" size="large" variant="tonal" block :disabled="is_loading == 1">
             Search
         </v-btn>
+        <!-- TODO: Search by label -->
     </v-form>
     <!-- NOTE: Button icons must use mdi icons manually, empty by default -->
     <!-- Page navigation -->
     <v-select v-model="current_page" label="Go to page:" :items="page_values" :disabled="is_loading == 1"
         @update:modelValue="onPageChange"></v-select>
-    <!-- Elements for comment editing -->
+    
     <v-row>
-        <v-btn @click="toggleComments" :disabled="selected_row == 0"> Edit Comment </v-btn>
+        <!-- Elements for comment editing -->
+        <v-btn @click="toggleComments" :disabled="selected_row == 0 || is_loading == 1"> Edit Comment </v-btn>
         <UpdateComments @CloseWindow="on_submit" eventType="low_level" ref="comments_ref"></UpdateComments>
         <!-- Elements for label editing -->
-         
-        <v-btn @click="toggleLabels" :disabled="selected_row == 0"> Edit Labels </v-btn>
+
+        <v-btn @click="toggleLabels" :disabled="selected_row == 0 || is_loading == 1"> Edit Labels </v-btn>
         <CRUDLabels @CloseWindow="on_submit" eventType="low_level" ref="labels_ref"></CRUDLabels>
 
     </v-row>

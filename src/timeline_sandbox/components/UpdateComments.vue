@@ -30,7 +30,7 @@ async function updateComments() {
             isProcessing.value = true
             // Sends form data to API
             let form = new FormData()
-            form.append('row_id', rowID.value)
+            form.append('rowID', rowID.value)
             form.append('comment', commentValue.value ? commentValue.value : "") // Handle null values
             const requestOptions = {
                 method: "POST",
