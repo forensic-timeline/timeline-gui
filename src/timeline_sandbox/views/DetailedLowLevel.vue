@@ -3,13 +3,17 @@ import { ref, useTemplateRef, onMounted } from 'vue'
 import { TabulatorFull as Tabulator } from 'tabulator-tables'; // NOTE: Around 420kb
 import UpdateComments from '../components/UpdateComments.vue';
 import CRUDLabels from '../components/CRUDLabels.vue';
+import SelectDateTime from '../components/SelectDateTime.vue';
 import "tabulator-tables/dist/css/tabulator.css"; //import Tabulator stylesheet
 
 // HTML References
+const search_form = useTemplateRef("searchForm")
 const data_table = useTemplateRef("data_table")
 let table = null // Tabulator object ref
 const comments_ref = useTemplateRef("comments_ref")
 const labels_ref = useTemplateRef("labels_ref")
+const start_min_date = useTemplateRef("start_min_date")
+const end_min_date = useTemplateRef("end_min_date")
 
 const is_ascending_values = [{
     title: 'Ascending',
@@ -69,19 +73,28 @@ const tabulator_columns = [
     }
 ]
 
+const date_rules = [
+    // Make sure min date is before max date
+    () => {
+        if (start_min_date.value.datetimeISOString > end_min_date.value.datetimeISOString) return 'Start date must be set before end date!'
+        else {
+            return true
+        }
+    }
+]
+
 // Values to send to API
 const include_terms = ref("")
 const exclude_terms = ref("")
 const is_ascending = ref(true)
 const selected_column = ref('id')
-// TODO
+// Variables for filter by label components
 const label_data = ref([])// HACK: Creates copy from CRUDLabels, retrieve here then pass to CRUDLabels so there's only one copy of labels?
 const use_label = ref(false)
 const selected_label = ref([]) // List of selected labels
-// TODO
+// Variables for filter by min date range components
 const use_time_range = ref(false)
-const min_time = ref()
-const max_time = ref()
+
 
 // Boolean for data loading state
 const is_loading = ref(false)
@@ -104,52 +117,59 @@ const selected_row = ref(false)
 // Uses GET, example like sciencedirect.com
 // TODO: Filter by date and time range
 async function retrieveData(curPage) {
-    is_loading.value = true
-    selected_row.value = false // Clear selected column
-    const requestOptions = {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-    };
-    await fetch(
-        '/api/v1/timeline/low_level?' +
-        new URLSearchParams({
-            include: include_terms.value,
-            exclude: exclude_terms.value,
-            asc: is_ascending.value,
-            byCol: selected_column.value,
-            curPage: (curPage > 0) ? curPage : 1,
-            filterLabel: (use_label.value && selected_label.value.length) ? JSON.stringify(selected_label.value) : "\"\""
-        }).toString(),
-        requestOptions
-    )
-        .then(response => response.json()
-            .then(data => ({
-                data: data,
-                status: response.status
-            }))
-            .then(res => {
-                if (res.status == 200) {
-                    page_data.value = res.data["page_rows"]
-                    total_page.value = res.data["max_page"]
+    search_form.value?.validate().then(async ({ valid: isValid }) => {
+        if (isValid) {
+            is_loading.value = true
+            selected_row.value = false // Clear selected column
+            const requestOptions = {
+                method: "GET",
+                headers: { "Content-Type": "application/json" },
+            };
+            await fetch(
+                '/api/v1/timeline/low_level?' +
+                new URLSearchParams({
+                    include: include_terms.value,
+                    exclude: exclude_terms.value,
+                    asc: is_ascending.value,
+                    byCol: selected_column.value,
+                    curPage: (curPage > 0) ? curPage : 1,
+                    filterLabel: (use_label.value && selected_label.value.length) ? JSON.stringify(selected_label.value) : "\"\"",
+                    // Just send the ISO String since regex can validate if it's a valid string
+                    // No need to validate if it's valid range (e.g 32nd day) since it's string comparison
+                    minDateRangeArr: (use_time_range.value) ? JSON.stringify([start_min_date.value.datetimeISOString, end_min_date.value.datetimeISOString]) : "\"\""
+                }).toString(),
+                requestOptions
+            )
+                .then(response => response.json()
+                    .then(data => ({
+                        data: data,
+                        status: response.status
+                    }))
+                    .then(res => {
+                        if (res.status == 200) {
+                            page_data.value = res.data["page_rows"]
+                            total_page.value = res.data["max_page"]
 
-                    // Update "go to page" values
-                    page_values.value = [1] // Must at least have 1 page
-                    for (let i = 2; i <= total_page.value; i++) {
-                        page_values.value.push(i)
-                    }
+                            // Update "go to page" values
+                            page_values.value = [1] // Must at least have 1 page
+                            for (let i = 2; i <= total_page.value; i++) {
+                                page_values.value.push(i)
+                            }
 
 
-                    // TODO: Handle server error
+                            // TODO: Handle server error
 
-                }
-            }));
+                        }
+                    }));
 
-    // TODO: Handle server error
-    if (table instanceof Tabulator) {
+            // TODO: Handle server error
+            if (table instanceof Tabulator) {
 
-        await table.setData(page_data.value)
-        is_loading.value = false
-    }
+                await table.setData(page_data.value)
+                is_loading.value = false
+            }
+        }
+    })
 }
 function toggleComments() {
     if (table instanceof Tabulator) {
@@ -168,11 +188,11 @@ function toggleLabels() {
 // must use Reflect functions to access the dict
 function loadLabels(label_dict) {
     label_data.value = []
-    for (const key of Reflect.ownKeys(label_dict)){
+    for (const key of Reflect.ownKeys(label_dict)) {
         label_data.value.push({
             "title": Reflect.get(label_dict, key),
             "value": parseInt(key)
-    })
+        })
     }
 }
 
@@ -221,7 +241,7 @@ async function on_submit() {
     <h2> Current page: {{ current_page }}</h2>
     <!-- Filter and sort submition -->
     <!-- FIXME: Validate terms amount or display error from server and reenable -->
-    <v-form @submit.prevent="on_submit">
+    <v-form @submit.prevent="on_submit" ref="searchForm">
         <h3> Search time, event type, source file path, evidence entry, or plugin. </h3>
         <h2> NOTE: Use whole words for searching </h2>
         <v-text-field v-model="include_terms" label="Include terms (whole words separated by space)"
@@ -240,9 +260,35 @@ async function on_submit() {
             <v-col><v-select v-model="selected_label" :disabled="is_loading == 1 || !use_label" label="Select label"
                     :items="label_data" multiple chips></v-select></v-col>
         </v-row>
-        <v-btn type="submit" class="mb-8" color="blue" size="large" variant="tonal" block :disabled="is_loading == 1">
-            Search
-        </v-btn>
+        <v-row>
+            <v-card>
+                <v-col>
+                    <v-col><v-switch v-model="use_time_range" :disabled="is_loading == 1"
+                            :label="`Filter by minimum date range?: ${(use_time_range) ? `Yes` : `No`}`"></v-switch></v-col>
+                </v-col>
+                <v-col>
+                    <v-input :rules="date_rules">
+                        <v-card subtitle="Start date">
+                            <SelectDateTime :disabled="is_loading == 1 || !use_time_range" ref="start_min_date">
+                            </SelectDateTime>
+                        </v-card>
+                        <v-card subtitle="End date">
+                            <SelectDateTime :disabled="is_loading == 1 || !use_time_range" ref="end_min_date">
+                            </SelectDateTime>
+
+                        </v-card>
+                    </v-input>
+
+                </v-col>
+            </v-card>
+        </v-row>
+        <v-row>
+            <v-btn type="submit" class="mb-8" color="blue" size="large" variant="tonal" block
+                :disabled="is_loading == 1">
+                Search
+            </v-btn>
+        </v-row>
+
         <!-- TODO: Search by label -->
     </v-form>
     <!-- NOTE: Button icons must use mdi icons manually, empty by default -->
@@ -257,13 +303,13 @@ async function on_submit() {
         <!-- Elements for label editing -->
 
         <v-btn @click="toggleLabels" :disabled="selected_row == 0 || is_loading == 1"> Edit Labels </v-btn>
-        <CRUDLabels @CloseWindow="on_submit" @LabelsLoaded="loadLabels" eventType="low_level" ref="labels_ref"></CRUDLabels>
+        <CRUDLabels @CloseWindow="on_submit" @LabelsLoaded="loadLabels" eventType="low_level" ref="labels_ref">
+        </CRUDLabels>
 
     </v-row>
 
     <v-pagination v-model="current_page" :length="total_page" :total-visible="total_visible" show-first-last-page=true
-        variant="outlined" @update:modelValue="on_submit"
-        :disabled="is_loading == 1"></v-pagination>
+        variant="outlined" @update:modelValue="on_submit" :disabled="is_loading == 1"></v-pagination>
     <!-- TODO: Loading bar for data -->
     <div>
         <v-progress-circular v-if="is_loading" color="primary" indeterminate></v-progress-circular>

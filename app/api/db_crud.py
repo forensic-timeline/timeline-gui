@@ -1,6 +1,7 @@
 from os.path import join
 from math import ceil
 from json import loads
+from re import match
 
 from flask import current_app, make_response, request, session
 
@@ -17,9 +18,10 @@ import app.model.timeline_model as TLModel
 from app import current_app
 from app.api import api
 
-AMOUNT_IN_PAGE = 1000  # Max events per page, 100k crashed tabulator
+AMOUNT_IN_PAGE = 10  # Max events per page, 100k crashed tabulator
 PAGES_AROUND = 1  # Max pages before and after current
-IS_ASCENDING_VALUES = {"true": "ASC", "false": "DESC"}
+IS_ASCENDING_VALUES = {True: "ASC", False: "DESC"}
+IS_ASCENDING_SIGN = {True: ">", False: "<"}
 # TODO: Automate column retrieval
 # MAKE SURE THE CLIENT SIDE MATCHES THESE VALUES
 # Stores all columns objects for ease of understanding + used for search and sort column
@@ -54,6 +56,24 @@ TABLE_VALUES = {
 }
 
 MAX_KEYWORDS = 10
+
+# Helper function to validate ISO 8601 string date range arrays
+def validISODateRange(date_range):
+    # Is it a valid string arr
+    if (len(date_range) == 2):
+        if isinstance(date_range[0],str) and isinstance(date_range[1],str):
+    # Are the dates valid ISO 8601 string
+            re_str = (r"^(-?(?:[0-9][0-9]*)?[0-9]{4})-(1[0-2]|0[0-9])-(3[01]|0[0-9]|[12]" +
+                      r"[0-9])T(2[0-3]|[01][0-9]):([0-5][0-9]):([0-5][0-9])(\.[0-9]{6})?(Z|" +
+                      r"[+-](?:2[0-3]|[01][0-9]):[0-5][0-9])?$")
+            if match(re_str, date_range[0]) and match(re_str, date_range[1]):
+    # Is the start date less than the end date?
+                if date_range[0] < date_range[1]:
+                    return True
+    # If pass all, return true
+    # Else return false
+    return False
+
 # Pagination function (use in API)
 # 1. Low level tables
 # 2. Low and high level timeline visualizations
@@ -65,7 +85,7 @@ MAX_KEYWORDS = 10
     # Add "GROUP BY" clause for order of "GROUP_CONCAT" function
     # It's so only the filtered & concatenated events are included in the JOIN operation
 # TEST: Measure execution time for each page retrieval
-# FIXME: Error handling
+# FIXME: Error handling for all execution
 # Support for search, filter, sort, range?
 def get_page_low_event(
     db_session: scoped_session,
@@ -75,9 +95,9 @@ def get_page_low_event(
     sort_asc: str = "true",
     sort_column: str = "id",
     get_page: int = 1,
-    filter_label: list[int] = []
+    filter_label: list[int] = [],
+    filter_min_date_range: list[str] = []
 ):
-    print(f"Label args: {filter_label}") # TEST
     is_filter_label = isinstance(filter_label, list) and len(filter_label) > 0
     # TEST: https://mysql.rjweb.org/doc.php/pagination
     cur_page = 1 if get_page < 1 else get_page  # Check min page requested
@@ -112,6 +132,13 @@ def get_page_low_event(
                                              f"(SELECT id FROM {table_name}_events_idx WHERE {table_name}_events_idx"
                                              f" MATCH \'{{{column_filter}}} : \'{" ".join(param_id)})"
                                             )
+    if validISODateRange(filter_min_date_range):
+        include_exclude = include_exclude + (f" AND {table_name}_events_idx.date_time_min > :startmindate " +
+                                             f"AND {table_name}_events_idx.date_time_min < :endmindate" 
+                                    )
+        parameters["startmindate"] = filter_min_date_range[0]
+        parameters["endmindate"] = filter_min_date_range[1]
+
     # If an include or exclude term existed, add match statement
     # Get max pages
     # HACK: So MATCH and id where statements can be appended conditionally
@@ -159,18 +186,19 @@ def get_page_low_event(
     # NOTE: If ORDER BY is in nested SELECT, it won't trigger without LIMIT
     # THEORY: Due to SQLite's query optimizer
     # If first, sort by first then limit
+    print(sort_asc) # TEST
+    # NOTE: Column names cannot be paramaterized!
     if cur_page <= 1:
-        sub_stmt_2 = f"{sub_stmt_2} ORDER BY :sortcolumn ASC LIMIT {AMOUNT_IN_PAGE}"
+        sub_stmt_2 = f"{sub_stmt_2} ORDER BY {sort_column} {IS_ASCENDING_VALUES[sort_asc]} LIMIT {AMOUNT_IN_PAGE}"
 
 
     # else if last, sort by last then limit
     elif cur_page >= max_page:
-        sub_stmt_2 = f"{sub_stmt_2} ORDER BY :sortcolumn DESC LIMIT {AMOUNT_IN_PAGE}"
+        sub_stmt_2 = f"{sub_stmt_2} ORDER BY {sort_column} {IS_ASCENDING_VALUES[not sort_asc]} LIMIT {AMOUNT_IN_PAGE}"
     # else calculate id to start retrieving with limit
     else:
-        sub_stmt_2 = f"{sub_stmt_2} AND id > :pagenum ORDER BY :sortcolumn {IS_ASCENDING_VALUES[sort_asc]} LIMIT {AMOUNT_IN_PAGE}"
-        parameters["pagenum"] = (cur_page - 1) * AMOUNT_IN_PAGE
-    parameters["sortcolumn"] = sort_column
+        sub_stmt_2 = f"{sub_stmt_2} AND id {IS_ASCENDING_SIGN[sort_asc]} :pagenum ORDER BY {sort_column} {IS_ASCENDING_VALUES[sort_asc]} LIMIT {AMOUNT_IN_PAGE}"
+        parameters["pagenum"] = (cur_page - 1) * AMOUNT_IN_PAGE if sort_asc else (max_page - cur_page + 1) * AMOUNT_IN_PAGE
 
     # If not filtered by label, join labels using left join to include events without labels
     if(is_filter_label):
@@ -185,6 +213,7 @@ def get_page_low_event(
     # Stores in temp dict of {id: rowdata} 
     try:
         for row in db_session.execute(text(stmt_2), parameters).all():
+            print(row._asdict()) # TEST
             row_dict = row._asdict()
             # If given id already exists, append to list of label name and id
             # Since accessing value by key is O(1)
@@ -242,8 +271,14 @@ def load_timeline(event_type):
     arg_bycol = request.args.get("byCol", default="id", type=str)
     arg_cur_page = request.args.get("curPage", default=1, type=int)
     arg_filter_label = "".join(request.args.get("filterLabel", default="", type=str).split()) # Remove whitespace for invalid
-    print(request.args.get("filterLabel", default="", type=str)) # TEST
-    print(arg_filter_label) # TEST
+    arg_min_date_range_list = loads(request.args.get("minDateRangeArr", default="", type=str)) # Remove whitespace for invalid
+
+    # Translates bool string to value
+    if arg_asc == "true":
+        arg_asc = True 
+    elif arg_asc == "false":
+        arg_asc = False
+
     # Limit number of include and exclude to MAX_KEYWORDS strings
     if len(arg_include) >= MAX_KEYWORDS or len(arg_exclude) >= MAX_KEYWORDS:
         db_session.remove()
@@ -272,7 +307,8 @@ def load_timeline(event_type):
         sort_asc=arg_asc,
         sort_column=arg_bycol,
         get_page=arg_cur_page,
-        filter_label=loads(arg_filter_label or 'null')
+        filter_label=loads(arg_filter_label or 'null'),
+        filter_min_date_range=arg_min_date_range_list
     )
     if isinstance(page_data, int) and page_data < 0:
         db_session.remove()

@@ -254,7 +254,7 @@ defineExpose({
 </script>
 
 <template>
-    <v-dialog v-model="isMainActive" width="50vw">
+    <v-dialog persistent v-model="isMainActive" width="50vw">
         <v-card :title="'Editing labels for event id: ' + rowID">
             <v-form @submit.prevent="" ref="mainFormRef">
                 <v-row>
@@ -311,7 +311,7 @@ defineExpose({
 
             <!-- Overlay for label create or selected label's update and delete -->
             <!-- NOTE: Javascript dict keys must be obj or string, so cast id to number before searching on db -->
-            <v-dialog v-model="isLabelCRUDActive" width="auto">
+            <v-dialog persistent v-model="isLabelCRUDActive" width="auto">
                 <!-- Dialogue content and behavior depends on which operation -->
                 <!-- Done instead of modifying form content for readability -->
                 <!-- CREATE -->
@@ -360,7 +360,7 @@ defineExpose({
                         <v-btn :disabled="isProcessing == 1 || !selectedLabel" class="mb-8" color="blue" size="large"
                             variant="tonal" block>
                             Delete label {{ labelList[selectedLabel] }}
-                            <v-dialog activator="parent">
+                            <v-dialog persistent activator="parent">
                                 <template v-slot:default="{ isActive }">
                                     <v-card max-width="400"
                                         text="Are you sure to delete the label? This process is irreversable!"

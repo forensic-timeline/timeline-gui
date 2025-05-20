@@ -63,7 +63,7 @@ defineExpose({
 </script>
 
 <template>
-    <v-dialog v-model="isActive" width="auto">
+    <v-dialog persistent v-model="isActive" width="auto">
         <v-card max-width="500" :title="'Editing comment for event id: ' + rowID">
             <v-form @submit.prevent="updateComments" ref="myForm">
                 <v-textarea :disabled="isProcessing == 1" v-model="commentValue" label="Edit Comments"
