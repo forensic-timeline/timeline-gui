@@ -2,7 +2,7 @@
 <script setup>
 import { ref, onBeforeMount, onMounted } from 'vue'
 // Event to notify parent to reload data
-const emit = defineEmits(['CloseWindow'])
+const emit = defineEmits(['CloseWindow', 'LabelsLoaded'])
 const props = defineProps(['eventType'])
 // Vars for modifying label to event
 const eventType = props.eventType // Low or high
@@ -11,7 +11,7 @@ const isMainActive = ref(false)
 const mainFormRef = ref()
 
 const labelList = ref() // JSON dict of id:name, retrieved before mount
-const selectLabels = ref([]) // New list of initial event label ids, modified by user
+const userSelectedLabels = ref() // New list of initial event label ids, modified by user
 let initialLabels = [] // Set of initial event label ids, given from event row
 // Vars for modifying label list
 const isLabelCRUDActive = ref(false)
@@ -33,13 +33,13 @@ const name_rules = [v => v ? v.length <= 50 : true || 'Max 50 characters']
 
 // TEST Rule if labels aren't changed
 const label_rule = [() => {
-    const setToDelete = initialLabels.filter(x => !selectLabels.value.includes(x))
-    const setToAdd = selectLabels.value.filter(x => !initialLabels.includes(x))
-    if(setToDelete.length > 0 || setToAdd.length > 0){
+    const setToDelete = initialLabels.filter(x => !userSelectedLabels.value.includes(x))
+    const setToAdd = userSelectedLabels.value.filter(x => !initialLabels.includes(x))
+    if (setToDelete.length > 0 || setToAdd.length > 0) {
         return true
     }
-        
-    else{
+
+    else {
         return "This event's label hasn't been changed yet!"
     }
 }]
@@ -49,10 +49,12 @@ function toggle(id, currentLabels) {
     rowID.value = id
     isMainActive.value = true
     // Turns label list into dicts with boolean values for selected labels
-    selectLabels.value = currentLabels
+    userSelectedLabels.value = currentLabels
     initialLabels = currentLabels
     retrieveAllLabel()
 }
+
+// 
 
 async function retrieveAllLabel() {
     isProcessing.value = true
@@ -76,6 +78,7 @@ async function retrieveAllLabel() {
                 // TODO: Handle server error
             }));
     isProcessing.value = false
+    emit("LabelsLoaded", labelList.value)
 }
 
 // Creates a set of the old label ids and new label ids
@@ -84,8 +87,8 @@ async function updateEventLabel() {
 
     mainFormRef.value?.validate().then(async ({ valid: isValid }) => {
         if (isValid) {
-            const setToDelete = initialLabels.filter(x => !selectLabels.value.includes(x))
-            const setToAdd = selectLabels.value.filter(x => !initialLabels.includes(x))
+            const setToDelete = initialLabels.filter(x => !userSelectedLabels.value.includes(x))
+            const setToAdd = userSelectedLabels.value.filter(x => !initialLabels.includes(x))
 
             isProcessing.value = true
             // Sends form data to API
@@ -144,17 +147,108 @@ function onClickLabelOption(operation) {
     }
 }
 
-async function createNewLabel() { }
+async function createNewLabel() {
+    labelCRUDFormRef.value?.validate().then(async ({ valid: isValid }) => {
+        if (isValid) {
+            isProcessing.value = true
+            // Sends form data to API
+            let form = new FormData()
+            form.append('newLabel', newLabel.value)
+            const requestOptions = {
+                method: "POST",
+                body: form
+            };
+            await fetch('/api/v1/timeline/add_label', requestOptions)
+                .then(response => response.text()
+                    .then(data => ({
+                        data: data,
+                        status: response.status
+                    }))
+                    .then(res => {
+                        if (res.status == 200) {
+                        }
+                        else {
+                            // TODO: Handle server error
+                        }
+                        isMainActive.value = false
+                        isLabelCRUDActive.value = false
+                        isProcessing.value = false
+                        emit("CloseWindow") // Tell parent to change the  isActive value to false
+                    }));
+        }
+    })
+}
 
-async function updateExistingLabel() { }
+async function updateExistingLabel() {
+    labelCRUDFormRef.value?.validate().then(async ({ valid: isValid }) => {
+        if (isValid) {
+            isProcessing.value = true
+            // Sends form data to API
+            let form = new FormData()
+            form.append('selectedLabel', parseInt(selectedLabel.value))
+            form.append('newLabel', newLabel.value)
+            const requestOptions = {
+                method: "POST",
+                body: form
+            };
+            await fetch('/api/v1/timeline/update_label', requestOptions)
+                .then(response => response.text()
+                    .then(data => ({
+                        data: data,
+                        status: response.status
+                    }))
+                    .then(res => {
+                        if (res.status == 200) {
+                        }
+                        else {
+                            // TODO: Handle server error
+                        }
+                        isMainActive.value = false
+                        isLabelCRUDActive.value = false
+                        isProcessing.value = false
+                        emit("CloseWindow") // Tell parent to change the  isActive value to false
+                    }));
+        }
+    })
+}
 
-async function deleteExistingLabel() { }
+async function deleteExistingLabel() {
+
+    isProcessing.value = true
+    // Sends form data to API
+    let form = new FormData()
+    form.append('selectedLabel', parseInt(selectedLabel.value))
+    const requestOptions = {
+        method: "POST",
+        body: form
+    };
+    await fetch('/api/v1/timeline/delete_label', requestOptions)
+        .then(response => response.text()
+            .then(data => ({
+                data: data,
+                status: response.status
+            }))
+            .then(res => {
+                if (res.status == 200) {
+                }
+                else {
+                    // TODO: Handle server error
+                }
+                isMainActive.value = false
+                isLabelCRUDActive.value = false
+                isProcessing.value = false
+                emit("CloseWindow") // Tell parent to change the  isActive value to false
+            }));
+
+}
 
 onMounted(async () => {
     await retrieveAllLabel()
 })
 
+// Expose list of labels and function to activate component
 defineExpose({
+    labelList,
     toggle
 });
 </script>
@@ -166,7 +260,7 @@ defineExpose({
                 <v-row>
                     <!-- TEST -->
                     <p>Selected label for edit:{{ selectedLabel }}</p>
-                    <p>Selected label for checkbox: {{ selectLabels }}</p>
+                    <p>Selected label for checkbox: {{ userSelectedLabels }}</p>
                     <v-col>
                         <!-- To display no labels changed error -->
                         <v-input :rules="label_rule"></v-input>
@@ -179,9 +273,8 @@ defineExpose({
                                     <v-card :disabled="isProcessing == 1" :class="['ma-4', selectedClass]"
                                         color="grey-lighten-1" rounded @click="toggle" width="200" height="50">
                                         <v-card-actions>
-                                            <v-checkbox :disabled="isProcessing == 1" v-model="selectLabels"
-                                                :label="name" :value="id" false-icon="mdi-checkbox-blank-outline"
-                                                true-icon="mdi-checkbox-outline"></v-checkbox>
+                                            <v-checkbox :disabled="isProcessing == 1" v-model="userSelectedLabels"
+                                                :label="name" :value="id"></v-checkbox>
                                         </v-card-actions>
 
                                     </v-card>
@@ -263,7 +356,7 @@ defineExpose({
 
                 <!-- DELETE -->
                 <v-card v-else-if="operationType == 3" max-width="500" title="Delete label">
-                    <v-form @submit.prevent="deleteExistingLabel">
+  
                         <v-btn :disabled="isProcessing == 1 || !selectedLabel" class="mb-8" color="blue" size="large"
                             variant="tonal" block>
                             Delete label {{ labelList[selectedLabel] }}
@@ -273,7 +366,7 @@ defineExpose({
                                         text="Are you sure to delete the label? This process is irreversable!"
                                         :title="'Confirm Deletion for ' + labelList[selectedLabel]">
                                         <template v-slot:actions>
-                                            <v-btn class="ml-auto" color="warning" text="Delete" type="submit"></v-btn>
+                                            <v-btn @click="deleteExistingLabel" class="ml-auto" color="warning" text="Delete"></v-btn>
                                             <v-btn class="ml-auto" text="Cancel"
                                                 @click="isActive.value = false"></v-btn>
                                         </template>
@@ -287,7 +380,6 @@ defineExpose({
                             color="yellow" size="large" variant="tonal" block>
                             Cancel
                         </v-btn>
-                    </v-form>
                 </v-card>
 
                 <!-- ERROR HANDLING -->

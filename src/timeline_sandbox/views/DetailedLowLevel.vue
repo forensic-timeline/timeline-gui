@@ -74,6 +74,14 @@ const include_terms = ref("")
 const exclude_terms = ref("")
 const is_ascending = ref(true)
 const selected_column = ref('id')
+// TODO
+const label_data = ref([])// HACK: Creates copy from CRUDLabels, retrieve here then pass to CRUDLabels so there's only one copy of labels?
+const use_label = ref(false)
+const selected_label = ref([]) // List of selected labels
+// TODO
+const use_time_range = ref(false)
+const min_time = ref()
+const max_time = ref()
 
 // Boolean for data loading state
 const is_loading = ref(false)
@@ -110,6 +118,7 @@ async function retrieveData(curPage) {
             asc: is_ascending.value,
             byCol: selected_column.value,
             curPage: (curPage > 0) ? curPage : 1,
+            filterLabel: (use_label.value && selected_label.value.length) ? JSON.stringify(selected_label.value) : "\"\""
         }).toString(),
         requestOptions
     )
@@ -141,9 +150,7 @@ async function retrieveData(curPage) {
         await table.setData(page_data.value)
         is_loading.value = false
     }
-
 }
-
 function toggleComments() {
     if (table instanceof Tabulator) {
         comments_ref.value.toggle(selected_row.value['id'], selected_row.value['user_comments'])
@@ -154,6 +161,18 @@ function toggleLabels() {
     if (table instanceof Tabulator) {
         // cid: List of label id's
         labels_ref.value.toggle(selected_row.value['id'], selected_row.value['cid'])
+    }
+}
+
+// Since values passed from vue's child events is a proxy,
+// must use Reflect functions to access the dict
+function loadLabels(label_dict) {
+    label_data.value = []
+    for (const key of Reflect.ownKeys(label_dict)){
+        label_data.value.push({
+            "title": Reflect.get(label_dict, key),
+            "value": parseInt(key)
+    })
     }
 }
 
@@ -172,9 +191,9 @@ onMounted(async () => {
         selected_row.value = row.getData()
     });
     // When no row is selected, so the buttons are disabled
-    table.on("rowDeselected", function(row){
-    //row - row component for the deselected row
-        if(selected_row.value == row.getData()){
+    table.on("rowDeselected", function (row) {
+        //row - row component for the deselected row
+        if (selected_row.value == row.getData()) {
             selected_row.value = false
         }
     });
@@ -205,14 +224,22 @@ async function on_submit() {
     <v-form @submit.prevent="on_submit">
         <h3> Search time, event type, source file path, evidence entry, or plugin. </h3>
         <h2> NOTE: Use whole words for searching </h2>
-        <v-text-field v-model="include_terms" label="Include terms (separated by space)"
+        <v-text-field v-model="include_terms" label="Include terms (whole words separated by space)"
             :disabled="is_loading == 1"></v-text-field>
-        <v-text-field v-model="exclude_terms" label="Exclude terms (separated by space)"
+        <v-text-field v-model="exclude_terms" label="Exclude terms (whole words separated by space)"
             :disabled="is_loading == 1"></v-text-field>
         <v-select v-model="is_ascending" label="Sort direction" :items="is_ascending_values"
             :disabled="is_loading == 1"></v-select>
         <v-select v-model="selected_column" label="Sort by column" :items="low_level_columns"
             :disabled="is_loading == 1"></v-select>
+        <v-row>
+            <v-col><v-switch v-model="use_label" :disabled="is_loading == 1"
+                    :label="`Filter by a label?: ${(use_label) ? `Yes` : `No`}`"></v-switch></v-col>
+            <!-- TODO: Support multiple labels at once -->
+            <p>{{ selected_label }}</p> <!-- TEST -->
+            <v-col><v-select v-model="selected_label" :disabled="is_loading == 1 || !use_label" label="Select label"
+                    :items="label_data" multiple chips></v-select></v-col>
+        </v-row>
         <v-btn type="submit" class="mb-8" color="blue" size="large" variant="tonal" block :disabled="is_loading == 1">
             Search
         </v-btn>
@@ -222,7 +249,7 @@ async function on_submit() {
     <!-- Page navigation -->
     <v-select v-model="current_page" label="Go to page:" :items="page_values" :disabled="is_loading == 1"
         @update:modelValue="onPageChange"></v-select>
-    
+
     <v-row>
         <!-- Elements for comment editing -->
         <v-btn @click="toggleComments" :disabled="selected_row == 0 || is_loading == 1"> Edit Comment </v-btn>
@@ -230,12 +257,12 @@ async function on_submit() {
         <!-- Elements for label editing -->
 
         <v-btn @click="toggleLabels" :disabled="selected_row == 0 || is_loading == 1"> Edit Labels </v-btn>
-        <CRUDLabels @CloseWindow="on_submit" eventType="low_level" ref="labels_ref"></CRUDLabels>
+        <CRUDLabels @CloseWindow="on_submit" @LabelsLoaded="loadLabels" eventType="low_level" ref="labels_ref"></CRUDLabels>
 
     </v-row>
 
     <v-pagination v-model="current_page" :length="total_page" :total-visible="total_visible" show-first-last-page=true
-        variant="outlined" next-icon="mdi-page-next" prev-icon="mdi-page-previous" @update:modelValue="on_submit"
+        variant="outlined" @update:modelValue="on_submit"
         :disabled="is_loading == 1"></v-pagination>
     <!-- TODO: Loading bar for data -->
     <div>

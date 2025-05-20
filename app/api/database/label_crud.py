@@ -11,6 +11,7 @@ from sqlalchemy import (
     select,
     delete,
     insert,
+    update,
     func,
     and_,
     or_,
@@ -64,18 +65,148 @@ def get_labels():
     db_engine.dispose()
     return make_response({"labels": label_dict}, 200)
 
+@api.route("/timeline/add_label", methods=["POST"])
+# @login_required
+# TEST: Add auth later
+def add_label():
+    if (
+        "newLabel" in request.form and
+        len("".join(request.form["newLabel"].split())) > 0 and # Check if string is not just whitespace
+        len(request.form["newLabel"]) <= 50
+    ):
+        # TODO: Replace with user's database session info
+        # TEST: Use test db to avoid processing with dftpl each test
+        database_uri = (
+            "sqlite:///"
+            + r"D:\Moving\Documents\Universitas - MatKul\PraTA_TA_LaporanKP\TA"
+            + r"\Proj\dftpl_gui_proj\test\timeline_2_fts5_short_12052025.sqlite"
+        )
+        db_engine = create_engine(database_uri, echo=True)
+        db_session = scoped_session(
+            sessionmaker(
+                autocommit=False,
+                autoflush=False,
+                bind=db_engine,
+            )
+        )
+        # Try to add, catch errors (like out of bounds error)
+        # HACK: Hardcoded table name
+        try:
+            stmt = insert(TLModel.Labels).values(name=request.form["newLabel"])
+            db_session.execute(stmt)
+            db_session.commit()
+        except DBAPIError as e:
+            print(repr(e))  # FIXME
+            db_session.remove()
+            db_engine.dispose()
+            return make_response("ERROR: Database engine error", 500)
+        db_session.remove()
+        db_engine.dispose()
+        return make_response("", 200)
+    else:
+        return make_response("", 400)
+    
+
+@api.route("/timeline/update_label", methods=["POST"])
+# @login_required
+# TEST: Add auth later
+def update_label():
+    if ("selectedLabel" in request.form and 
+        "newLabel" in request.form and
+        len("".join(request.form["newLabel"].split())) > 0 and # Check if string is not just whitespace
+        len(request.form["newLabel"]) <= 50
+    ):
+        try:
+            label_id = int(request.form["selectedLabel"])
+        except ValueError as e:
+            return make_response("", 400)
+        # TODO: Replace with user's database session info
+        # TEST: Use test db to avoid processing with dftpl each test
+        database_uri = (
+            "sqlite:///"
+            + r"D:\Moving\Documents\Universitas - MatKul\PraTA_TA_LaporanKP\TA"
+            + r"\Proj\dftpl_gui_proj\test\timeline_2_fts5_short_12052025.sqlite"
+        )
+        db_engine = create_engine(database_uri, echo=True)
+        db_session = scoped_session(
+            sessionmaker(
+                autocommit=False,
+                autoflush=False,
+                bind=db_engine,
+            )
+        )
+        # Try to add, catch errors (like out of bounds error)
+        # HACK: Hardcoded table name
+        try:
+            stmt = update(TLModel.Labels).where(TLModel.Labels.id == label_id).values(name=request.form["newLabel"])
+            db_session.execute(stmt)
+            db_session.commit()
+        except DBAPIError as e:
+            print(repr(e))  # FIXME
+            db_session.remove()
+            db_engine.dispose()
+            return make_response("ERROR: Database engine error", 500)
+        db_session.remove()
+        db_engine.dispose()
+        return make_response("", 200)
+    else:
+        return make_response("", 400)
+
+# Retrieve labels as a dict of {id: name}
+@api.route("/timeline/delete_label", methods=["POST"])
+# @login_required
+# TEST: Add auth later
+def delete_label():
+    if ("selectedLabel" in request.form
+    ):
+        try:
+            label_id = int(request.form["selectedLabel"])
+        except ValueError as e:
+            return make_response("", 400)
+        # TODO: Replace with user's database session info
+        # TEST: Use test db to avoid processing with dftpl each test
+        database_uri = (
+            "sqlite:///"
+            + r"D:\Moving\Documents\Universitas - MatKul\PraTA_TA_LaporanKP\TA"
+            + r"\Proj\dftpl_gui_proj\test\timeline_2_fts5_short_12052025.sqlite"
+        )
+        db_engine = create_engine(database_uri, echo=True)
+        db_session = scoped_session(
+            sessionmaker(
+                autocommit=False,
+                autoflush=False,
+                bind=db_engine,
+            )
+        )
+        # Try to add, catch errors (like out of bounds error)
+        # HACK: Hardcoded table name
+        try:
+            stmt = delete(TLModel.Labels).where(TLModel.Labels.id == label_id)
+            db_session.execute(stmt)
+            db_session.commit()
+        except DBAPIError as e:
+            print(repr(e))  # FIXME
+            db_session.remove()
+            db_engine.dispose()
+            return make_response("ERROR: Database engine error", 500)
+        db_session.remove()
+        db_engine.dispose()
+        return make_response("", 200)
+    else:
+        return make_response("", 400)
 
 # Update label timeline many to many relationships
 @api.route("/timeline/<string:event_type>/u_labels", methods=["POST"])
 # @login_required``
 # TEST: Add auth later
-def update_labels(event_type):
+def update_event_labels(event_type):
     if (
         event_type in ["low_level", "high_level"]
         and "rowID" in request.form
         and "setToDelete" in request.form
         and "setToAdd" in request.form
     ):
+        # FIXME: Catch json loading error
         set_to_delete = loads(request.form["setToDelete"])
         set_to_add = loads(request.form["setToAdd"])
         # TODO: Replace with user's database session info

@@ -1,5 +1,6 @@
 from os.path import join
 from math import ceil
+from json import loads
 
 from flask import current_app, make_response, request, session
 
@@ -59,6 +60,10 @@ MAX_KEYWORDS = 10
 # Arguments:
 
 
+# Label logic:
+    # Join event row with labels to retrieve attached label (many to many)
+    # Add "GROUP BY" clause for order of "GROUP_CONCAT" function
+    # It's so only the filtered & concatenated events are included in the JOIN operation
 # TEST: Measure execution time for each page retrieval
 # FIXME: Error handling
 # Support for search, filter, sort, range?
@@ -70,7 +75,10 @@ def get_page_low_event(
     sort_asc: str = "true",
     sort_column: str = "id",
     get_page: int = 1,
+    filter_label: list[int] = []
 ):
+    print(f"Label args: {filter_label}") # TEST
+    is_filter_label = isinstance(filter_label, list) and len(filter_label) > 0
     # TEST: https://mysql.rjweb.org/doc.php/pagination
     cur_page = 1 if get_page < 1 else get_page  # Check min page requested
     max_page = 1
@@ -104,15 +112,25 @@ def get_page_low_event(
                                              f"(SELECT id FROM {table_name}_events_idx WHERE {table_name}_events_idx"
                                              f" MATCH \'{{{column_filter}}} : \'{" ".join(param_id)})"
                                             )
-    
     # If an include or exclude term existed, add match statement
     # Get max pages
     # HACK: So MATCH and id where statements can be appended conditionally
-    stmt = f"SELECT COUNT(id) FROM {table_name}_events_idx WHERE 1=1" 
-
-    if include_exclude != "":
-        stmt = f"{stmt} {include_exclude}"
+    if is_filter_label:
+        stmt = f"SELECT * FROM {table_name}_events_idx WHERE 1=1" 
+        if include_exclude != "":
+            stmt = f"{stmt} {include_exclude}"
     
+        # If filter by label, add inner join to only include events with label
+        # and to calculate page properly
+        stmt = (f"SELECT COUNT(a.id) FROM ({stmt}) AS a " +
+            "INNER JOIN labels_low_level_events AS b ON b.low_level_events_id = a.id " +
+            "INNER JOIN labels AS c ON b.labels_id = c.id "
+            f"WHERE c.id IN ({", ".join(str(id) for id in filter_label)})")
+    else:
+        stmt = f"SELECT COUNT(id) FROM {table_name}_events_idx WHERE 1=1"   
+
+
+
     try:
         max_page = ceil(
             float(db_session.scalars(text(stmt), parameters).first()) / float(AMOUNT_IN_PAGE)
@@ -129,6 +147,15 @@ def get_page_low_event(
 
     if include_exclude != "":
         sub_stmt_2 = f"{sub_stmt_2} {include_exclude}"
+
+    # If filter by label, add inner join to only include events with label
+    # and to calculate page properly
+    if is_filter_label:
+        sub_stmt_2 = (f"SELECT a.*, c.id as cid, c.name as cname FROM ({sub_stmt_2}) AS a " +
+            "INNER JOIN labels_low_level_events AS b ON b.low_level_events_id = a.id " +
+            "INNER JOIN labels AS c ON b.labels_id = c.id "
+            f"WHERE c.id IN ({", ".join(str(id) for id in filter_label)})")
+
     # NOTE: If ORDER BY is in nested SELECT, it won't trigger without LIMIT
     # THEORY: Due to SQLite's query optimizer
     # If first, sort by first then limit
@@ -145,16 +172,16 @@ def get_page_low_event(
         parameters["pagenum"] = (cur_page - 1) * AMOUNT_IN_PAGE
     parameters["sortcolumn"] = sort_column
 
-    # Join event row with labels to retrieve attached label (many to many)
-    # Add "GROUP BY" clause for order of "GROUP_CONCAT" function
-    # It's so only the filtered & concatenated events are included in the JOIN operation
-    stmt_2 = (
-        f"SELECT a.*, c.id as cid, c.name as cname FROM ({sub_stmt_2}) AS a " +
-        "LEFT JOIN labels_low_level_events AS b ON b.low_level_events_id = a.id " +
-        "LEFT JOIN labels AS c ON b.labels_id = c.id "
-    )
+    # If not filtered by label, join labels using left join to include events without labels
+    if(is_filter_label):
+        stmt_2 = sub_stmt_2
 
-
+    else:
+        stmt_2 = (
+            f"SELECT a.*, c.id as cid, c.name as cname FROM ({sub_stmt_2}) AS a " +
+            "LEFT JOIN labels_low_level_events AS b ON b.low_level_events_id = a.id " +
+            "LEFT JOIN labels AS c ON b.labels_id = c.id "
+        )
     # Stores in temp dict of {id: rowdata} 
     try:
         for row in db_session.execute(text(stmt_2), parameters).all():
@@ -200,9 +227,9 @@ def load_timeline(event_type):
         + r"D:\Moving\Documents\Universitas - MatKul\PraTA_TA_LaporanKP\TA"
         + r"\Proj\dftpl_gui_proj\test\timeline_2_fts5_short_12052025.sqlite"
     )
-    db_engine = create_engine(database_uri)
+    db_engine = create_engine(database_uri, echo=True) # TEST
     db_session = scoped_session(
-        sessionmaker(autocommit=False, autoflush=False, bind=db_engine, )
+        sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
     )
     # FIXME: Do input validation against acceptable values, return invalid request if failed
     # FIXME: Catch ValueError
@@ -214,6 +241,9 @@ def load_timeline(event_type):
     arg_asc = request.args.get("asc", default="true", type=str)
     arg_bycol = request.args.get("byCol", default="id", type=str)
     arg_cur_page = request.args.get("curPage", default=1, type=int)
+    arg_filter_label = "".join(request.args.get("filterLabel", default="", type=str).split()) # Remove whitespace for invalid
+    print(request.args.get("filterLabel", default="", type=str)) # TEST
+    print(arg_filter_label) # TEST
     # Limit number of include and exclude to MAX_KEYWORDS strings
     if len(arg_include) >= MAX_KEYWORDS or len(arg_exclude) >= MAX_KEYWORDS:
         db_session.remove()
@@ -242,6 +272,7 @@ def load_timeline(event_type):
         sort_asc=arg_asc,
         sort_column=arg_bycol,
         get_page=arg_cur_page,
+        filter_label=loads(arg_filter_label or 'null')
     )
     if isinstance(page_data, int) and page_data < 0:
         db_session.remove()
