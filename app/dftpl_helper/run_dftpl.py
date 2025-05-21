@@ -97,13 +97,14 @@ def generate_analysers_list():
 # FIXME: Catch error
 def store_timelines(low_timeline: LowLevelTimeline, high_timeline: HighLevelTimeline):
     # Create DB using model
+    
+    db_name = token_hex(16) + ".sqlite"
     engine = create_engine(
         (
             "sqlite:///"
             + current_app.config["UPLOAD_DIR"]
             + "\\"
-            + token_hex(16)
-            + ".sqlite"
+            + db_name
         ),
     )
 
@@ -201,6 +202,8 @@ def store_timelines(low_timeline: LowLevelTimeline, high_timeline: HighLevelTime
     print("Highlevelevents commited") # TEST
     db_session.remove()
     engine.dispose()
+    # If no error, store DB Name to session
+    session["session_db"] = db_name
     print("Done") # TEST
     return 0
 

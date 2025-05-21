@@ -52,9 +52,10 @@ async function callDftpl() {
     await fetch(`/api/v1/run-dftpl`, requestOptions)
         .then(response => response)
         .then(data => server_response.value  = data)
-    // TEST
         if (server_response.value.status == 200){
-            alert("DB SUCCESS")
+            // TODO: Replace with better alert
+            alert("DB SUCCESS") //TEST
+            window.location.replace("timeline")
         }
         else{
             alert(server_response.value.text())

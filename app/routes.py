@@ -1,4 +1,4 @@
-from flask import render_template, Blueprint, url_for
+from flask import render_template, Blueprint, url_for, redirect
 from pathlib import PurePosixPath
 
 from flask_login import login_required
@@ -9,6 +9,11 @@ main_routes = Blueprint('main_routes', __name__)
 main_routes.template_folder = Config.DIST_DIR
 main_routes.static_folder = Config.STATIC_DIR
 # TODO: Reroute '/' to either '/auth' or '/timeline_sandbox' if user session is valid
+@main_routes.route('/')
+def domain_redirect():
+    # Checks if user is logged in, if yes redirect to start
+    return redirect("/start", code=302)
+    # Else go to auth
 # TODO: Add redirect if user is logged in for login route
 @main_routes.route('/auth')
 def auth():
@@ -28,9 +33,8 @@ def start():
     entry = str(PurePosixPath('src', 'start_page', 'index.html'))
     return render_template(entry)
 
-@main_routes.route('/timeline_sandbox')
-#TEST: Testing visualization
-#@login_required 
+@main_routes.route('/timeline')
+@login_required 
 def index_plot_sandbox():
     entry = str(PurePosixPath('src', 'timeline_sandbox', 'index.html'))
     # Instead of using Flask's template folder, build path to Vue pages manually.

@@ -15,22 +15,22 @@ async function loadHash() {
     };
 
     await fetch(`/api/v1/confirm-hash/download`, requestOptions)
-    .then(response => response.json()
+        .then(response => response.text()
             .then(data => ({
                 data: data,
                 status: response.status
             }))
             .then(res => {
                 if (res.status == 200) {
-                    file_hash.value = data
-                    
+                    file_hash.value = res.data
+
                 }
                 else {
                     // TODO: Handle server error
-                    file_hash.value = data
+                    file_hash.value = res.status
                 }
             }));
-        }
+}
 
 defineExpose({
     loadHash

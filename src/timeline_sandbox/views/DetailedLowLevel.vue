@@ -4,6 +4,7 @@ import { TabulatorFull as Tabulator } from 'tabulator-tables'; // NOTE: Around 4
 import UpdateComments from '../components/UpdateComments.vue';
 import CRUDLabels from '../components/CRUDLabels.vue';
 import SelectDateTime from '../components/SelectDateTime.vue';
+import DownloadDB from '../components/DownloadDB.vue';
 import "tabulator-tables/dist/css/tabulator.css"; //import Tabulator stylesheet
 
 // HTML References
@@ -287,6 +288,7 @@ async function on_submit() {
                 :disabled="is_loading == 1">
                 Search
             </v-btn>
+            <DownloadDB></DownloadDB>
         </v-row>
 
         <!-- TODO: Search by label -->

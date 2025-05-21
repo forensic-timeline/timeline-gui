@@ -425,7 +425,7 @@ def undo_upload():
 # @login_required
 def download_file():
     if request.method == "GET":
-        return send_from_directory(current_app.config["UPLOAD_DIR"], session['session_db'])
+        return send_from_directory(current_app.config["UPLOAD_DIR"], session['session_db'], as_attachment=True)
 
 
 #
