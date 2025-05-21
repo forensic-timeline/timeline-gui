@@ -47,14 +47,14 @@ SCHEMA_TABLE_SQL_VAL = [
 	high_level_events_id INTEGER NOT NULL, 
 	PRIMARY KEY (labels_id, high_level_events_id), 
 	FOREIGN KEY(labels_id) REFERENCES labels (id), 
-	FOREIGN KEY(high_level_events_id) REFERENCES high_level_events (id)
+	FOREIGN KEY(high_level_events_id) REFERENCES high_level_events (id) ON DELETE CASCADE
 )""",
     """CREATE TABLE labels_low_level_events (
 	labels_id INTEGER NOT NULL, 
 	low_level_events_id INTEGER NOT NULL, 
 	PRIMARY KEY (labels_id, low_level_events_id), 
 	FOREIGN KEY(labels_id) REFERENCES labels (id), 
-	FOREIGN KEY(low_level_events_id) REFERENCES low_level_events (id)
+	FOREIGN KEY(low_level_events_id) REFERENCES low_level_events (id) ON DELETE CASCADE
 )""",
     """CREATE TABLE low_level_events (
 	id INTEGER NOT NULL, 
@@ -135,7 +135,7 @@ labels_high_level_events_table = Table(
     Base.metadata,
     Column("labels_id", ForeignKey("labels.id"), primary_key=True),
     Column(
-        "high_level_events_id", ForeignKey("high_level_events.id"), primary_key=True
+        "high_level_events_id", ForeignKey("high_level_events.id", ondelete="CASCADE"), primary_key=True
     ),
 )
 
@@ -143,7 +143,7 @@ labels_low_level_events_table = Table(
     "labels_low_level_events",
     Base.metadata,
     Column("labels_id", ForeignKey("labels.id"), primary_key=True),
-    Column("low_level_events_id", ForeignKey("low_level_events.id"), primary_key=True),
+    Column("low_level_events_id", ForeignKey("low_level_events.id", ondelete="CASCADE"), primary_key=True),
 )
 
 
@@ -228,10 +228,10 @@ class Labels(Base):
     name: Mapped[str] = mapped_column(String(), unique=True)
     # Many to many
     low_level_events: Mapped[Optional[List["LowLevelEvents"]]] = relationship(
-        secondary=labels_low_level_events_table, back_populates="labels"
+        secondary=labels_low_level_events_table, back_populates="labels", cascade="all"
     )
     high_level_events: Mapped[Optional[List["HighLevelEvents"]]] = relationship(
-        secondary=labels_high_level_events_table, back_populates="labels"
+        secondary=labels_high_level_events_table, back_populates="labels", cascade="all"
     )
 
 

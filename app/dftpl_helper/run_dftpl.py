@@ -5,17 +5,13 @@ from os.path import join  # Construct path name
 from os import remove
 from secrets import token_hex  # Generate random file name
 
-# TODO: ADD THE REST OF THE ANALYZERS
 # Import all dftpl analysers by default
 # Update the list of usable analysers to match dftpl
-# TEST: Only imported analysers needed for testing
 # TODO: Add a function in dftpl to generate:
 # 1. dictionary mapping of all analyser classes
-# 2. update analysers.json list of all analysers
 import dftpl.analyzers.useractivity.FileDownloads as FileDownloads
 import dftpl.analyzers.useractivity.RecentFileAccess as RecentFileAccess
-
-# import dftpl.analyzers.useractivity.SoftwareInstallation as SoftwareInstallation
+import dftpl.analyzers.useractivity.SoftwareInstallation as SoftwareInstallation
 import dftpl.analyzers.useractivity.USBConnectedRegDeviceClasses as USBConnectedRegDeviceClasses
 import dftpl.analyzers.useractivity.USBConnectedRegUSB as USBConnectedRegUSB
 import dftpl.analyzers.useractivity.USBConnectedRegUSBSTOR as USBConnectedRegUSBSTOR
@@ -23,14 +19,31 @@ import dftpl.analyzers.useractivity.USBConnectedWinevt as USBConnectedWinevt
 import dftpl.analyzers.useractivity.WindowsEventLogCleared as WindowsEventLogCleared
 import dftpl.analyzers.useractivity.WindowsFirewallDisabled as WindowsFirewallDisabled
 import dftpl.analyzers.web.AllImagesFromCache as AllImagesFromCache
-
-# import dftpl.analyzers.web.AllVideoFromCache as AllVideoFromCache
+import dftpl.analyzers.web.AllVideoFromCache as AllVideoFromCache
 import dftpl.analyzers.web.BingSearch as BingSearch
 import dftpl.analyzers.web.GoogleSearch as GoogleSearch
 import dftpl.analyzers.web.WebVisits as WebVisits
+import dftpl.analyzers.windows.DefaultBrowser as DefaultBrowser
+import dftpl.analyzers.windows.DeviceInstallation as DeviceInstallation
+import dftpl.analyzers.windows.FailedLogin as FailedLogin
+import dftpl.analyzers.windows.FileMRURegistry as FileMRURegistry
+import dftpl.analyzers.windows.LastExecutedBAM as LastExecutedBAM
+import dftpl.analyzers.windows.LastExecutedPCA as LastExecutedPCA
+import dftpl.analyzers.windows.LastExecutedPrefetch as LastExecutedPrefetch
+import dftpl.analyzers.windows.LastExecutedUserAssist as LastExecutedUserAssist
 import dftpl.analyzers.windows.LastShutdown as LastShutdown
+import dftpl.analyzers.windows.NetworkCards as NetworkCards
+import dftpl.analyzers.windows.NetworkProfiles as NetworkProfiles
 import dftpl.analyzers.windows.ProcessCreation as ProcessCreation
 import dftpl.analyzers.windows.ProgramOpened as ProgramOpened
+import dftpl.analyzers.windows.RecycleBin as RecycleBin
+import dftpl.analyzers.windows.RunRunOnceRegistry as RunRunOnceRegistry
+import dftpl.analyzers.windows.ServiceInstalled as ServiceInstalled
+import dftpl.analyzers.windows.TimezoneSettings as TimezoneSettings
+import dftpl.analyzers.windows.TrustRecordsRegistry as TrustRecordsRegistry
+import dftpl.analyzers.windows.Users as Users
+
+# DFTPL Classes
 from dftpl.events.HighLevelEvent import HighLevelEvent
 from dftpl.events.LowLevelEvent import LowLevelEvent
 
@@ -55,6 +68,7 @@ from app import current_app
 DEFAULT_analyser = {
     FileDownloads.description: FileDownloads,
     RecentFileAccess.description: RecentFileAccess,
+    SoftwareInstallation.description: SoftwareInstallation,
     USBConnectedRegDeviceClasses.description: USBConnectedRegDeviceClasses,
     USBConnectedRegUSB.description: USBConnectedRegUSB,
     USBConnectedRegUSBSTOR.description: USBConnectedRegUSBSTOR,
@@ -62,12 +76,29 @@ DEFAULT_analyser = {
     WindowsEventLogCleared.description: WindowsEventLogCleared,
     WindowsFirewallDisabled.description: WindowsFirewallDisabled,
     AllImagesFromCache.description: AllImagesFromCache,
+    AllVideoFromCache.description: AllVideoFromCache,
     BingSearch.description: BingSearch,
     GoogleSearch.description: GoogleSearch,
     WebVisits.description: WebVisits,
+    DefaultBrowser.description: DefaultBrowser,
+    DeviceInstallation.description: DeviceInstallation,
+    FailedLogin.description: FailedLogin,
+    FileMRURegistry.description: FileMRURegistry,
+    LastExecutedBAM.description: LastExecutedBAM,
+    LastExecutedPCA.description: LastExecutedPCA,
+    LastExecutedPrefetch.description: LastExecutedPrefetch,
+    LastExecutedUserAssist.description: LastExecutedUserAssist,
     LastShutdown.description: LastShutdown,
+    NetworkCards.description: NetworkCards,
+    NetworkProfiles.description: NetworkProfiles,
     ProcessCreation.description: ProcessCreation,
     ProgramOpened.description: ProgramOpened,
+    RecycleBin.description: RecycleBin,
+    RunRunOnceRegistry.description: RunRunOnceRegistry,
+    ServiceInstalled.description: ServiceInstalled,
+    TimezoneSettings.description: TimezoneSettings,
+    TrustRecordsRegistry.description: TrustRecordsRegistry,
+    Users.description: Users
 }
 
 
