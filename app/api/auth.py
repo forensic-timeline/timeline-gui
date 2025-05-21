@@ -131,7 +131,7 @@ def logout():
 # Returns 0 for success, -1 for OSError or FileNotFoundError, -2 for unknowns
 # NOTE: Doesn't get called when program terminates, only when user logs out
 # TODO: Clean up when program terminates (clean folder instead on individual files)
-def clean_up(csv=True, db=True):
+def clean_up(app, user, csv=True, db=True):
     try:
         if csv and "session_csv" in session:
             remove(join(current_app.config['UPLOAD_DIR'], session.pop('session_csv', None)))
