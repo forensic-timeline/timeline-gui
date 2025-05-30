@@ -3,6 +3,7 @@ import {createRouter, createWebHashHistory} from 'vue-router'
 
 // SFCs
 import App from './App.vue'
+import DetailedHighLevel from './views/DetailedHighLevel.vue'
 import DetailedLowLevel from './views/DetailedLowLevel.vue'
 // Vuetify
 import 'vuetify/styles'
@@ -27,9 +28,19 @@ const router = createRouter(
       // },
       {
         path: '/',
-        name: 'detailed-low-level',
+        redirect: '/low-level'
+      },
+      {
+        path: '/low-level',
+        name: 'low_level',
         component: DetailedLowLevel
       }
+      ,
+      {
+        path: '/high-level',
+        name: 'high_level',
+        component: DetailedHighLevel
+      } 
     ]
   }
 )

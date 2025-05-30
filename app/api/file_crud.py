@@ -411,7 +411,9 @@ def confirm_hash(operation):
 @api.route("/upload/undo-upload", methods=["GET"])
 @login_required
 def undo_upload():
-    if clean_up() < 0:
+    # HACK: App and user variable is for flask-login's event
+    # Not used here.        
+    if clean_up("","") < 0:
         return make_response(
             "Error while clean up, please check server for more information.", 500
         )

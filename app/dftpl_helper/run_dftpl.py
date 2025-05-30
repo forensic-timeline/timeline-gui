@@ -140,6 +140,7 @@ def store_timelines(low_timeline: LowLevelTimeline, high_timeline: HighLevelTime
     )
 
     listen(TLModel.LowLevelEvents.__table__, 'after_create', fts5Model.CreateFtsTable(TLModel.LowLevelEvents))
+    listen(TLModel.HighLevelEvents.__table__, 'after_create', fts5Model.CreateFtsTable(TLModel.HighLevelEvents))
 
     TLModel.Base.metadata.create_all(engine)
     # Write both high level and low level timelines to db
@@ -148,6 +149,8 @@ def store_timelines(low_timeline: LowLevelTimeline, high_timeline: HighLevelTime
     )
 
     listen(TLModel.LowLevelEvents, 'after_insert', fts5Model.attach_fts_low_level)
+    listen(TLModel.HighLevelEvents, 'after_insert', fts5Model.attach_fts_high_level)
+
 
     # Iterate over low level events and write to DB
     count = 1

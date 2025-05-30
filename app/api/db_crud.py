@@ -10,13 +10,13 @@ from flask_login import login_required
 from sqlalchemy import create_engine, text  # Python objects for DB connections
 from sqlalchemy import select, func, and_, or_  # Methods for sql expressions
 from sqlalchemy.orm import scoped_session, sessionmaker
-from sqlalchemy.dialects import sqlite # TEST
 from sqlalchemy.exc import DBAPIError
 
 
 import app.model.timeline_model as TLModel
 from app import current_app
 from app.api import api
+
 
 AMOUNT_IN_PAGE = 10  # Max events per page, 100k crashed tabulator
 PAGES_AROUND = 1  # Max pages before and after current
@@ -57,6 +57,20 @@ TABLE_VALUES = {
 
 MAX_KEYWORDS = 10
 
+# Definition of db URL string using session value
+def returnDBURL():
+    # TEST: TEST DB PATH
+    return (
+            "sqlite:///"
+            + r"D:\Moving\Documents\Universitas - MatKul\PraTA_TA_LaporanKP\TA"
+            + r"\Proj\dftpl_gui_proj\test\timeline_2_fts5_short_final_24052025.sqlite"
+        )
+    return "sqlite:///" + join(
+        current_app.config["UPLOAD_DIR"]
+        + "\\"
+        + f"{session['session_db']}"
+    )
+
 # Helper function to validate ISO 8601 string date range arrays
 def validISODateRange(date_range):
     # Is it a valid string arr
@@ -87,7 +101,7 @@ def validISODateRange(date_range):
 # TEST: Measure execution time for each page retrieval
 # FIXME: Error handling for all execution
 # Support for search, filter, sort, range?
-def get_page_low_event(
+def get_page_event(
     db_session: scoped_session,
     table_name: str,
     filter_include: list[str] = [],
@@ -113,6 +127,7 @@ def get_page_low_event(
     # Generates MATCH statement with parameter tokens
     # HACK: Hardcoded table name
     # FIXME: Escape characters such as '%' in sqlite
+    # TODO: Test if searching comments is possible
     if len(filter_include) > 0:
         param_id = []
         for index, word in enumerate(filter_include):
@@ -150,7 +165,7 @@ def get_page_low_event(
         # If filter by label, add inner join to only include events with label
         # and to calculate page properly
         stmt = (f"SELECT COUNT(a.id) FROM ({stmt}) AS a " +
-            "INNER JOIN labels_low_level_events AS b ON b.low_level_events_id = a.id " +
+            f"INNER JOIN labels_{table_name}_events AS b ON b.{table_name}_events_id = a.id " +
             "INNER JOIN labels AS c ON b.labels_id = c.id "
             f"WHERE c.id IN ({", ".join(str(id) for id in filter_label)})")
     else:
@@ -179,7 +194,7 @@ def get_page_low_event(
     # and to calculate page properly
     if is_filter_label:
         sub_stmt_2 = (f"SELECT a.*, c.id as cid, c.name as cname FROM ({sub_stmt_2}) AS a " +
-            "INNER JOIN labels_low_level_events AS b ON b.low_level_events_id = a.id " +
+            f"INNER JOIN labels_{table_name}_events AS b ON b.{table_name}_events_id = a.id " +
             "INNER JOIN labels AS c ON b.labels_id = c.id "
             f"WHERE c.id IN ({", ".join(str(id) for id in filter_label)})")
 
@@ -207,9 +222,20 @@ def get_page_low_event(
     else:
         stmt_2 = (
             f"SELECT a.*, c.id as cid, c.name as cname FROM ({sub_stmt_2}) AS a " +
-            "LEFT JOIN labels_low_level_events AS b ON b.low_level_events_id = a.id " +
+            f"LEFT JOIN labels_{table_name}_events AS b ON b.{table_name}_events_id = a.id " +
             "LEFT JOIN labels AS c ON b.labels_id = c.id "
         )
+
+    # INPROGRESS
+    # TODO: If high level, also retrieve keys by left join
+    if table_name == "high_level":
+        stmt_2 = (
+            f"SELECT * FROM ({stmt_2}) " +
+            "LEFT JOIN (" +
+            "SELECT key_name, key_value, high_level_events_id FROM keys" +
+            ") AS k ON k.high_level_events_id = id"
+        )
+
     # Stores in temp dict of {id: rowdata} 
     try:
         for row in db_session.execute(text(stmt_2), parameters).all():
@@ -220,12 +246,22 @@ def get_page_low_event(
             # NOTE: JS Dict key values must be obj or string, so id is converted into string before returned
 
             if(row_dict["id"] in page_rows):
-                page_rows[row_dict["id"]]["cid"].append(str(row_dict["cid"]))
-                page_rows[row_dict["id"]]["cname"].append(row_dict["cname"])
+                if row_dict["cid"]:
+                    page_rows[row_dict["id"]]["cid"].append(str(row_dict["cid"]))
+                if row_dict["cname"]:
+                    page_rows[row_dict["id"]]["cname"].append(row_dict["cname"])
+                if table_name == "high_level" and row_dict["key_name"]:
+                    page_rows[row_dict["id"]]["key_name"].append(row_dict["key_name"])
+
             else:
                 page_rows[row_dict["id"]] = row_dict
-                page_rows[row_dict["id"]]["cid"] = [str(row_dict["cid"])]
-                page_rows[row_dict["id"]]["cname"] = [row_dict["cname"]]
+                if row_dict["cid"]:
+                    page_rows[row_dict["id"]]["cid"] = [str(row_dict["cid"])]
+                if row_dict["cname"]:
+                    page_rows[row_dict["id"]]["cname"] = [row_dict["cname"]]
+                if table_name == "high_level" and row_dict["key_name"]:
+                    page_rows[row_dict["id"]]["key_name"] = [row_dict["key_name"]]
+
         # Convert back to list of row dicts which is O(n)
         # Better than manually checking if there's duplicate id in a list of dicts
         # Which could be O(n^2)
@@ -239,23 +275,13 @@ def get_page_low_event(
     # Return results
     return {"max_page": max_page, "page_rows": page_rows}
 
-
-# When user first loads timeline, retrieve:
-# First and last event id
-# def get_edge_id(table_name):
-
-
+# Validates arguments and retrieves timeline data
 @api.route("/timeline/<string:event_type>", methods=["GET"])
-# @login_required
-# TEST: Add auth later
+# @login_required # TEST
 def load_timeline(event_type):
     # TODO: Replace with user's database session info
     # TEST: Use test db to avoid processing with dftpl each test
-    database_uri = (
-        "sqlite:///"
-        + r"D:\Moving\Documents\Universitas - MatKul\PraTA_TA_LaporanKP\TA"
-        + r"\Proj\dftpl_gui_proj\test\timeline_2_fts5_short_12052025.sqlite"
-    )
+    database_uri = returnDBURL()
     db_engine = create_engine(database_uri, echo=True) # TEST
     db_session = scoped_session(
         sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
@@ -299,7 +325,7 @@ def load_timeline(event_type):
 
     # Update valid values if needed
 
-    page_data = get_page_low_event(
+    page_data = get_page_event(
         db_session=db_session,
         table_name=event_type,
         filter_include=arg_include,
@@ -321,31 +347,48 @@ def load_timeline(event_type):
     return make_response(page_data, 200)
 
 
-# Statistics API
-# For summary of timeline and other aggregate functions
+# Keys API
+# INPROGRESS
+# Currently only used to retrieve keys from keys table for high level events
+# since low level events doesn't have separate key objects
+@api.route("/timeline/high_level/get_keys", methods=["GET"])
+#@login_required # TEST
+def get_high_level_keys():
+    # Get row id from GET Args
+    row_id = request.args.get("rowID", default=0, type=int)
 
-# Label APIs
-# Create new Label
-# Delete old label
-# List new labels (pagination?)
-# Rename old label
+    keys_data = {}
+    database_uri = returnDBURL()
+    db_engine = create_engine(database_uri, echo=True) # TEST
+    db_session = scoped_session(
+        sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
+    )
+    stmt = select(TLModel.Keys).where(TLModel.Keys.high_level_events_id == row_id)
+    
+    try:
+        for row in db_session.scalars(stmt).all():
+            if isinstance(row, TLModel.Keys):
+                keys_data[row.key_name] = row.key_value
+    except DBAPIError as e:
+        print(repr(e)) # FIXME
+        return make_response("ERROR: Invalid Request", 400)
+    except Exception as e: # HACK
+        print(repr(e)) # FIXME
+        return make_response("ERROR: Invalid Request", 400)
+
+    return make_response(keys_data, 200)
 
 # Comment APIs
 # Edit
 @api.route("/timeline/<string:event_type>/u_comments", methods=["POST"])
-# @login_required
-# TEST: Add auth later
+# @login_required #TEST
 def update_comments(event_type):
     if event_type in ["low_level", "high_level"] and "rowID" in request.form and "comment" in request.form:
         if len(request.form["comment"]) > 200:
             return make_response("", 400)
         # TODO: Replace with user's database session info
         # TEST: Use test db to avoid processing with dftpl each test
-        database_uri = (
-            "sqlite:///"
-            + r"D:\Moving\Documents\Universitas - MatKul\PraTA_TA_LaporanKP\TA"
-            + r"\Proj\dftpl_gui_proj\test\timeline_2_fts5_short_12052025.sqlite"
-        )
+        database_uri = returnDBURL()
         db_engine = create_engine(database_uri)
         db_session = scoped_session(
             sessionmaker(autocommit=False, autoflush=False, bind=db_engine, )
@@ -375,3 +418,4 @@ def update_comments(event_type):
         return make_response("", 200)
     else:
         return make_response("", 400)
+    

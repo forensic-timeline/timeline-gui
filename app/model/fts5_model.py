@@ -37,7 +37,7 @@ def compile_create_fts_table(element, compiler, **kw):
 
 def attach_fts_low_level(mapper, conn: Connection, instance: LowLevelEvents):
     meta = MetaData()
-    # TEST: Add the proper columns for searching
+    # Add the columns used for searching
     table = Table(
             'low_level_events_idx', # HACK: Hardcoded table name
             meta,
@@ -60,5 +60,28 @@ def attach_fts_low_level(mapper, conn: Connection, instance: LowLevelEvents):
                              provenance_raw_entry=instance.provenance_raw_entry,
                              keys=instance.keys)
     )
-# @event.listens_for(HighLevelEvents, 'after_attach')
-# def attach_fts_high_level(session, instance):
+
+def attach_fts_high_level(mapper, conn: Connection, instance: HighLevelEvents):
+    meta = MetaData()
+    # Add the columns used for searching
+    table = Table(
+            'high_level_events_idx', # HACK: Hardcoded table name
+            meta,
+            Column("date_time_min", String),
+            Column("date_time_max", String),
+            Column("event_type", String),
+            Column("description", String),
+            Column("category", String),
+            Column("reasoning_description", String),
+            Column("reasoning_reference", String),
+        )
+    conn.execute(
+        insert(table).values(date_time_min=instance.date_time_min,
+                             date_time_max=instance.date_time_max,
+                             event_type=instance.event_type,
+                             description=instance.description,
+                             category=instance.category,
+                             reasoning_description=instance.reasoning_description,
+                             reasoning_reference=instance.reasoning_reference)
+    )
+

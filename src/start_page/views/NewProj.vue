@@ -56,18 +56,17 @@ function on_submit() {
 }
 
 onMounted(async () => {
-  //TODO: Add loading screen/icon for analyser data loading
   await load_analyser_list()
   // Initialize Dropzone
   myDropzone = new Dropzone(dropzoneRef.value, {
     autoProcessQueue: false,
     acceptedFiles: '.csv',
     paramName: 'file',
-    chunking: true,// TODO: Implement chunking
+    chunking: true,
     forceChunking: true,
     url: '/api/v1/upload',
     maxFiles: 1,
-    maxFilesize: 5 * 1024, // in MiB
+    maxFilesize: 12 * 1024, // in MiB
     chunkSize: 10 * 1024 * 1024, // in B
     // Custom messages
     dictInvalidFileType: "File must be a plaso timeline with '.csv' output format."

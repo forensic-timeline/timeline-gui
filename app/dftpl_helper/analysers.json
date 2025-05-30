@@ -9,6 +9,10 @@
             "category": "User Activity"
         },
         {
+            "name": "Software Installed",
+            "category": "System"
+        },
+        {
             "name": "USB Device Connected (Registry DeviceClasses)",
             "category": "User Activity"
         },
@@ -37,6 +41,10 @@
             "category": "Web"
         },
         {
+            "name": "Cached Video",
+            "category": "Web"
+        },
+        {
             "name": "Bing Search",
             "category": "Web"
         },
@@ -49,8 +57,48 @@
             "category": "Web Overview"
         },
         {
+            "name": "Default Browser",
+            "category": "System"
+        },
+        {
+            "name": "Device Installation",
+            "category": "System"
+        },
+        {
+            "name": "Failed Login",
+            "category": "System"
+        },
+        {
+            "name": "Microsoft Office File MRU Registry Key",
+            "category": "System"
+        },
+        {
+            "name": "Last Time Executed (Registry BAM)",
+            "category": "Windows"
+        },
+        {
+            "name": "Last Time Executed (Program Compatibility Assistant)",
+            "category": "Windows"
+        },
+        {
+            "name": "Last Time Executed (Prefetch)",
+            "category": "Windows"
+        },
+        {
+            "name": "Last Time Executed (Registry UserAssist)",
+            "category": "Windows"
+        },
+        {
             "name": "Windows Shutdown",
             "category": "System"
+        },
+        {
+            "name": "Network Interfaces",
+            "category": "Windows"
+        },
+        {
+            "name": "Network Profiles",
+            "category": "Windows"
         },
         {
             "name": "Process Creation",
@@ -59,6 +107,30 @@
         {
             "name": "Program Opened",
             "category": "System"
+        },
+        {
+            "name": "Deletion Time (Recycle Bin)",
+            "category": "System"
+        },
+        {
+            "name": "Run/Run Once Registry Key",
+            "category": "System"
+        },
+        {
+            "name": "Service Installed",
+            "category": "System"
+        },
+        {
+            "name": "Timezone Settings Changed",
+            "category": "Windows"
+        },
+        {
+            "name": "Microsoft Office Trust Records Registry Key",
+            "category": "System"
+        },
+        {
+            "name": "Creation of User",
+            "category": "Windows"
         }
     ]
 }

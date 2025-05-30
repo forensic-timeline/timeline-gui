@@ -34,7 +34,7 @@ def start():
     return render_template(entry)
 
 @main_routes.route('/timeline')
-@login_required 
+# @login_required # TEST
 def index_plot_sandbox():
     entry = str(PurePosixPath('src', 'timeline_sandbox', 'index.html'))
     # Instead of using Flask's template folder, build path to Vue pages manually.

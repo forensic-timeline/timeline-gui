@@ -5,6 +5,7 @@ import UpdateComments from '../components/UpdateComments.vue';
 import CRUDLabels from '../components/CRUDLabels.vue';
 import SelectDateTime from '../components/SelectDateTime.vue';
 import DownloadDB from '../components/DownloadDB.vue';
+import DetailedKeysView from '../components/DetailedKeysView.vue';
 import NavTabs from '../components/NavTabs.vue';
 import "tabulator-tables/dist/css/tabulator.css"; //import Tabulator stylesheet
 
@@ -16,6 +17,7 @@ const comments_ref = useTemplateRef("comments_ref")
 const labels_ref = useTemplateRef("labels_ref")
 const start_min_date = useTemplateRef("start_min_date")
 const end_min_date = useTemplateRef("end_min_date")
+const detailed_keys_ref = ref()
 
 const is_ascending_values = [{
     title: 'Ascending',
@@ -29,7 +31,7 @@ const is_ascending_values = [{
 // Columns that are used for db sorting
 // MAKE SURE THE VALIDATION MATCHES THESE VALUES
 // NOTE: Currently unused columns (date_time_max,)
-const low_level_columns = [
+const high_level_columns = [
     {
         title: 'ID',
         value: 'id'
@@ -43,16 +45,28 @@ const low_level_columns = [
         value: 'event_type'
     },
     {
-        title: 'Source File Path',
-        value: 'path'
+        title: 'Description',
+        value: 'description'
     },
     {
-        title: 'Evidence Entry',
-        value: 'evidence'
+        title: 'Category',
+        value: 'category'
     },
     {
-        title: 'Plugin',
-        value: 'plugin'
+        title: 'Reasoning Description',
+        value: 'reasoning_description'
+    },
+    {
+        title: 'Reference',
+        value: 'reasoning_reference'
+    },
+    {
+        title: 'Test Event Type',
+        value: 'test_event_type'
+    },
+    {
+        title: 'Test Event Evidence Regex',
+        value: 'test_event_evidence'
     },
 ]
 // MAKE SURE DB SCHEMA MATCHES THE COLUMNS
@@ -62,12 +76,17 @@ const tabulator_columns = [
     { title: "ID", field: "id", sorter: "number", },
     { title: "Time (Min)", field: "date_time_min", sorter: "string", },
     { title: "Time (Max)", field: "date_time_max", sorter: "string", },
-    { title: "Event Type", field: "event_type", sorter: "string", },
-    { title: "Source File Path", field: "path", sorter: "string", formatter: "textarea"},
-    { title: "Evidence Entry", field: "evidence", sorter: "string", formatter: "textarea"},
-    { title: "Plugin", field: "plugin", sorter: "string", },
-    { title: "Provenence Raw Entry", field: "provenence_raw_entry", sorter: "string", formatter: "textarea"},
-    { title: "Keys", field: "keys", sorter: "string", },
+    { title: "Description", field: "description", sorter: "string", formatter: "textarea"},
+    { title: "Category", field: "path", sorter: "string", },
+    { title: "Reasoning Description", field: "reasoning_description", sorter: "string", formatter: "textarea"},
+    { title: "Reference", field: "reasoning_reference", sorter: "string", formatter: "textarea"},
+    { title: "Test Event Type", field: "test_event_type", sorter: "string", },
+    { title: "Test Event Evidence Regex", field: "test_event_evidence", sorter: "string", formatter: "textarea"},
+    {
+        title: "Key Names", field: "key_name", formatter: "array", formatterParams: {
+            delimiter: "|", //join values using the "|" delimiter
+        }, headerSort: false
+    },
     { title: "User Comments", field: "user_comments", sorter: "string", formatter: "textarea"},
     {
         title: "Labels", field: "cname", formatter: "array", formatterParams: {
@@ -108,7 +127,7 @@ const page_data = ref()
 // Page information, changed by vuetify pagination component
 const current_page = ref(1)
 const page_values = ref([1])
-const total_page = ref(10) //Total page length, calculated by db
+const total_page = ref(10) //Total page length calculated by db
 // Max visible page for pagination, const value
 const total_visible = ref(5)
 // Selected row's data by tabulator
@@ -117,6 +136,7 @@ const selected_row = ref(false)
 
 // retrieveData: Retrieve paginated data asynchronously
 // Uses GET, example like sciencedirect.com
+// TODO: Filter by date and time range
 async function retrieveData(curPage) {
     search_form.value?.validate().then(async ({ valid: isValid }) => {
         if (isValid) {
@@ -127,7 +147,7 @@ async function retrieveData(curPage) {
                 headers: { "Content-Type": "application/json" },
             };
             await fetch(
-                '/api/v1/timeline/low_level?' +
+                '/api/v1/timeline/high_level?' +
                 new URLSearchParams({
                     include: include_terms.value,
                     exclude: exclude_terms.value,
@@ -172,12 +192,13 @@ async function retrieveData(curPage) {
         }
     })
 }
+// Calls function on child components to disable dialog
 function toggleComments() {
     if (table instanceof Tabulator) {
         comments_ref.value.toggle(selected_row.value['id'], selected_row.value['user_comments'])
     }
 }
-
+// Calls function on child components to disable dialog
 function toggleLabels() {
     if (table instanceof Tabulator) {
         // cid: List of label id's
@@ -195,6 +216,10 @@ function loadLabels(label_dict) {
             "value": parseInt(key)
         })
     }
+}
+
+function beforeLoadKey() {
+    detailed_keys_ref.value.loadRowID(selected_row.value['id'])
 }
 
 // onBeforeMount: Call retrieveData to get first page and max amount of page for pagination
@@ -239,7 +264,7 @@ async function on_submit() {
 </script>
 
 <template>
-    <NavTabs eventType="low_level"></NavTabs>
+    <NavTabs eventType="high_level"></NavTabs>
 
     <h2> Current page: {{ current_page }}</h2>
     <!-- Filter and sort submition -->
@@ -253,7 +278,7 @@ async function on_submit() {
             :disabled="is_loading == 1"></v-text-field>
         <v-select v-model="is_ascending" label="Sort direction" :items="is_ascending_values"
             :disabled="is_loading == 1"></v-select>
-        <v-select v-model="selected_column" label="Sort by column" :items="low_level_columns"
+        <v-select v-model="selected_column" label="Sort by column" :items="high_level_columns"
             :disabled="is_loading == 1"></v-select>
         <v-row>
             <v-col><v-switch v-model="use_label" :disabled="is_loading == 1"
@@ -302,13 +327,14 @@ async function on_submit() {
     <v-row>
         <!-- Elements for comment editing -->
         <v-btn @click="toggleComments" :disabled="selected_row == 0 || is_loading == 1"> Edit Comment </v-btn>
-        <UpdateComments @CloseWindow="on_submit" eventType="low_level" ref="comments_ref"></UpdateComments>
+        <UpdateComments @CloseWindow="on_submit" eventType="high_level" ref="comments_ref"></UpdateComments>
         <!-- Elements for label editing -->
 
         <v-btn @click="toggleLabels" :disabled="selected_row == 0 || is_loading == 1"> Edit Labels </v-btn>
-        <CRUDLabels @CloseWindow="on_submit" @LabelsLoaded="loadLabels" eventType="low_level" ref="labels_ref">
+        <CRUDLabels @CloseWindow="on_submit" @LabelsLoaded="loadLabels" eventType="high_level" ref="labels_ref">
         </CRUDLabels>
 
+        <DetailedKeysView :disabled="selected_row == 0 || is_loading == 1" @click="beforeLoadKey" ref="detailed_keys_ref"></DetailedKeysView>
     </v-row>
 
     <v-pagination v-model="current_page" :length="total_page" :total-visible="total_visible" show-first-last-page=true

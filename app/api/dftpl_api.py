@@ -29,7 +29,7 @@ def get_analysers():
 
 
 @api.route("/run-dftpl", methods=["GET"])
-@login_required
+# @login_required #TEST
 def call_run_dftpl():
     if run_dftpl(
         join(

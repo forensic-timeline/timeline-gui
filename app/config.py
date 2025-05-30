@@ -50,4 +50,6 @@ class Config(object):
     ]  # Use .sqlite for database files for clarity on what type of db
     MAX_FILE_SIZE = (
         5 * 1073741824
-    )  # TEST: 5 GB Temporary limit. Practical size 1 KB = 1024 B
+    )  # HACK: 5 GB Flask upload limit. Practical size 1 KB = 1024 B
+    # Technically unused since dropzonejs has it's own chunked upload but
+    # set just in case

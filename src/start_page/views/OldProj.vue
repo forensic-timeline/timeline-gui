@@ -39,7 +39,7 @@ onMounted(async () => {
     forceChunking: true,
     url: '/api/v1/upload',
     maxFiles: 1,
-    maxFilesize: 5 * 1024, // in MiB
+    maxFilesize: 2 * 1024, // in MiB
     chunkSize: 10 * 1024 * 1024, // in B
     // Custom messages
     dictInvalidFileType: "File must be an sqlite db with '.sqlite' extension."

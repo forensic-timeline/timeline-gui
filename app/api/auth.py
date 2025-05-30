@@ -8,7 +8,6 @@ from flask import request, session, current_app
 from flask_login import current_user, login_required, login_user, logout_user
 
 # Input validation
-# TODO: Import parts of validators to reduce size
 # FIXME: Check for ERROR HANDLING FOR flask-login
 from wtforms import Form, PasswordField, StringField, validators
 
@@ -82,8 +81,6 @@ class ValidateSignIn(Form):
 
 
 
-#FIXME: If accessing without auth, stop redirecting with arguments
-#FIXME: Why sometimes after server reset, it takes multiple attempts to login before success?
 @api.route("/sign-in", methods=["POST"])
 def sign_in():
     try:
@@ -96,7 +93,6 @@ def sign_in():
                 sa.select(User).where(User.username == request.json["username"])
             )
             if user is None or not user.check_password(request.json["password"]):
-                # TODO: Refresh page
                 return {"message": "ERROR: Wrong username or password!"}
             if current_user.is_authenticated:
                 return {"message": "ERROR: Please log out from your first browser first!"}
