@@ -2,11 +2,10 @@ import re
 from os import remove
 from os.path import join, exists
 import sqlalchemy as sa
-from flask import request, session, current_app
+from flask import request, session, current_app, make_response
 
 # Auth
 from flask_login import current_user, login_required, login_user, logout_user
-
 # Input validation
 # FIXME: Check for ERROR HANDLING FOR flask-login
 from wtforms import Form, PasswordField, StringField, validators
@@ -35,7 +34,7 @@ def validate_password(form, field):
 def validate_duplicate_username(form, field):
     user = db.session.scalar(sa.select(User).where(User.username == field.data))
     if user is not None:
-        raise validators.ValidationError("Please use a different username.")
+        raise validators.StopValidation("Please use a different username.")
 
 
 # Classes for server-side validation
@@ -87,23 +86,26 @@ def sign_in():
         # First, validate input
         validator = ValidateSignIn(data=request.json)
         if request.method == "POST":
-            validator.validate()
+            if not validator.validate():
+                for key, value in validator.errors.items():
+                    return make_response(value[0], 400)
             # If input is validated, authenticate user
             user = db.session.scalar(
                 sa.select(User).where(User.username == request.json["username"])
             )
             if user is None or not user.check_password(request.json["password"]):
-                return {"message": "ERROR: Wrong username or password!"}
+                return make_response("Wrong username or password!", 400)
             if current_user.is_authenticated:
-                return {"message": "ERROR: Please log out from your first browser first!"}
+                return make_response("Please log out from your first browser first!", 400)
             login_user(user)
             # TODO: Redirect to project upload
-            return {
-            "message": "redirect"
-            }
+            return make_response("Account created!", 200)
 
     except (validators.StopValidation, validators.ValidationError) as e:
-        return {"message": str(e)}
+        # FIXME: LOGGING
+        return make_response(str(e), 400)
+    except Exception as e:
+        return make_response("Unknown error!", 500)
 
 # TODO: 
 # 1. Call SQLAlchemy's Engine.dispose() so db file isn't being used.
@@ -114,10 +116,11 @@ def sign_in():
 @login_required
 def logout():
     # TODO: Check if session and it's info is deleted entirely
-    print(f"Logged out {current_user.username}")
+    username = current_user.username
     logout_user()
+    print(f"Logged out {username}") # HACK
     # TODO: Redirect back to login
-    return {"message": "Logged out!"}
+    return make_response("Successfully logged out!", 200)
 
 # On LOGOUT (event listener setup in __init__):
 # Delete user's session variables and files
@@ -127,7 +130,11 @@ def logout():
 # Returns 0 for success, -1 for OSError or FileNotFoundError, -2 for unknowns
 # NOTE: Doesn't get called when program terminates, only when user logs out
 # TODO: Clean up when program terminates (clean folder instead on individual files)
-def clean_up(app, user, csv=True, db=True):
+# FIXME: Logging
+@api.route("/cleanup", methods=["GET"])
+@login_required
+def clean_up(app=None, user=None, csv=True, db=True):
+    print(f"Cleaning files") # HACK
     try:
         if csv and "session_csv" in session:
             remove(join(current_app.config['UPLOAD_DIR'], session.pop('session_csv', None)))
@@ -153,22 +160,27 @@ def clean_up(app, user, csv=True, db=True):
 @api.route("/sign-up", methods=["POST"])
 def sign_up():
     try:
+        # Validate with return value since validator error when raised is handled by validator, not returned to calling function
         validator = ValidateSignUp(data=request.json)
         if request.method == "POST":
-            validator.validate()
+            if not validator.validate():
+                for key, value in validator.errors.items():
+                    return make_response(value[0], 400)
             # First, validate input
-            print(request.json)
             user = User(username=request.json["username"])
             user.set_password(request.json["password"])
             db.session.add(user)
             db.session.commit()
-            return {"message": "Successfully signed up!"}
-
+            login_user(user)
+            return make_response("Successfully signed in!", 200)
     except (validators.StopValidation, validators.ValidationError) as e:
-        return {"message": str(e)}
-
+        # FIXME: LOGGING
+        return make_response(str(e), 400)
+    except Exception as e:
+        print(str(e))
+        return make_response("Unknown error!", 500)
 
 @api.route("/get-user", methods=["GET"])
 @login_required
 def get_user():
-    return [current_user.username]
+    return current_user.username
