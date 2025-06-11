@@ -40,7 +40,7 @@ defineExpose({
 <template>
     <v-card class="mx-auto">
         <template v-slot:title>
-            <span class="font-weight-black">Please confirm SHA256 file hash below with your local file</span>
+            <span class="font-weight-black">Please confirm SHA256 file hash below with the downloaded file</span>
         </template>
 
         <v-card-text class="bg-surface-light pt-4">

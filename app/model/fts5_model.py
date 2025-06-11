@@ -64,6 +64,7 @@ def attach_fts_low_level(mapper, conn: Connection, instance: LowLevelEvents):
 def attach_fts_high_level(mapper, conn: Connection, instance: HighLevelEvents):
     meta = MetaData()
     # Add the columns used for searching
+    # FIXME: Could add 2 more columns
     table = Table(
             'high_level_events_idx', # HACK: Hardcoded table name
             meta,

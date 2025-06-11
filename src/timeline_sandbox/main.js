@@ -28,12 +28,17 @@ const router = createRouter(
       // },
       {
         path: '/',
-        redirect: '/low-level'
+        redirect: '/low-level/1'
       },
       {
         path: '/low-level',
+        redirect: '/low-level/1'
+      },
+      {
+        path: '/low-level/:goToPage',
         name: 'low_level',
-        component: DetailedLowLevel
+        component: DetailedLowLevel,
+        props: true
       }
       ,
       {

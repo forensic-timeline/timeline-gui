@@ -1,12 +1,20 @@
 <script setup>
-import { ref, useTemplateRef, onMounted } from 'vue'
+import { ref, useTemplateRef, onMounted, defineProps, watch } from 'vue'
 import { TabulatorFull as Tabulator } from 'tabulator-tables'; // NOTE: Around 420kb
+import { useRouter } from 'vue-router'
 import UpdateComments from '../components/UpdateComments.vue';
 import CRUDLabels from '../components/CRUDLabels.vue';
 import SelectDateTime from '../components/SelectDateTime.vue';
 import DownloadDB from '../components/DownloadDB.vue';
 import NavTabs from '../components/NavTabs.vue';
-import "tabulator-tables/dist/css/tabulator.css"; //import Tabulator stylesheet
+
+// Props
+const props = defineProps({
+    goToPage: {
+        default: 1,
+        type: Number
+    }
+})
 
 // HTML References
 const search_form = useTemplateRef("searchForm")
@@ -63,19 +71,18 @@ const tabulator_columns = [
     { title: "Time (Min)", field: "date_time_min", sorter: "string", },
     { title: "Time (Max)", field: "date_time_max", sorter: "string", },
     { title: "Event Type", field: "event_type", sorter: "string", },
-    { title: "Source File Path", field: "path", sorter: "string", formatter: "textarea"},
-    { title: "Evidence Entry", field: "evidence", sorter: "string", formatter: "textarea"},
-    { title: "Plugin", field: "plugin", sorter: "string", },
-    { title: "Provenence Raw Entry", field: "provenence_raw_entry", sorter: "string", formatter: "textarea"},
+    { title: "Source File Path", field: "path", sorter: "string", formatter: "textarea", width: 200  },
+    { title: "Evidence Entry", field: "evidence", sorter: "string", formatter: "textarea", width: 200 },
+    { title: "Plugin", field: "plugin", sorter: "string", formatter: "textarea", width: 200  },
+    { title: "Provenence Raw Entry", field: "provenance_raw_entry", sorter: "string", formatter: "textarea", width: 200  },
     { title: "Keys", field: "keys", sorter: "string", },
-    { title: "User Comments", field: "user_comments", sorter: "string", formatter: "textarea"},
+    { title: "User Comments", field: "user_comments", sorter: "string", formatter: "textarea" , width: 200 },
     {
         title: "Labels", field: "cname", formatter: "array", formatterParams: {
             delimiter: "|", //join values using the "|" delimiter
-        }, headerSort: false
+        }, headerSort: false, width: 200 
     }
 ]
-
 const date_rules = [
     // Make sure min date is before max date
     () => {
@@ -85,6 +92,8 @@ const date_rules = [
         }
     }
 ]
+const router = useRouter() // Ref to vue router
+
 
 // Values to send to API
 const include_terms = ref("")
@@ -104,10 +113,13 @@ const is_loading = ref(false)
 
 // Received page data
 const page_data = ref()
+// Received server error
+const is_server_error = ref(false)
+const server_error_msg = ref()
 
 // Page information, changed by vuetify pagination component
 const current_page = ref(1)
-const page_values = ref([1])
+const page_values = ref([1]) //Pagination values
 const total_page = ref(10) //Total page length, calculated by db
 // Max visible page for pagination, const value
 const total_visible = ref(5)
@@ -133,7 +145,7 @@ async function retrieveData(curPage) {
                     exclude: exclude_terms.value,
                     asc: is_ascending.value,
                     byCol: selected_column.value,
-                    curPage: (curPage > 0) ? curPage : 1,
+                    curPage: (curPage > 0) ? curPage : 1, // Server already checks for out of bounds current page
                     filterLabel: (use_label.value && selected_label.value.length) ? JSON.stringify(selected_label.value) : "\"\"",
                     // Just send the ISO String since regex can validate if it's a valid string
                     // No need to validate if it's valid range (e.g 32nd day) since it's string comparison
@@ -141,9 +153,9 @@ async function retrieveData(curPage) {
                 }).toString(),
                 requestOptions
             )
-                .then(response => response.json()
+                .then(response => response.text() //Assumes error
                     .then(data => ({
-                        data: data,
+                        data: response.status == 200 ? JSON.parse(data) : data, //If not error, parse data json
                         status: response.status
                     }))
                     .then(res => {
@@ -157,13 +169,13 @@ async function retrieveData(curPage) {
                                 page_values.value.push(i)
                             }
 
-
-                            // TODO: Handle server error
-
+                        }
+                        else {
+                            is_server_error.value = true
+                            server_error_msg.value = res.data
                         }
                     }));
 
-            // TODO: Handle server error
             if (table instanceof Tabulator) {
 
                 await table.setData(page_data.value)
@@ -199,6 +211,7 @@ function loadLabels(label_dict) {
 
 // onBeforeMount: Call retrieveData to get first page and max amount of page for pagination
 onMounted(async () => {
+    console.log("TEST") // TEST
     // Setup tabulator
     table = new Tabulator(data_table.value, {
         columns: tabulator_columns,
@@ -219,106 +232,139 @@ onMounted(async () => {
         }
     });
 
-    await retrieveData(1)
+    // If user wants to go to a specific page, send here
+    current_page.value = (typeof +props.goToPage === "number" && !isNaN(+props.goToPage)) ? +props.goToPage : current_page.value
+    await retrieveData(current_page.value)
 
+})
+
+// If page changed, assigns new page value
+watch (() => {
+    current_page.value = (typeof +props.goToPage === "number" && !isNaN(+props.goToPage)) ? +props.goToPage : current_page.value
+})
+// Then reload
+watch( async () => {
+    // If user wants to go to a specific page, send here
+    console.log("RUN!") // TEST
+    await retrieveData(current_page.value)
 })
 
 // TEST: Testing pagination events
 // When pagination state changes, call API to load said page
-async function onPageChange(event) {
-
-    await retrieveData(current_page.value)
-
+function onPageChange(event) {
+    router.push({
+        name: "low_level",
+        params: {
+            goToPage: current_page.value
+        }
+    })
 }
 
 // Wait for button's submit event to resolve
 async function on_submit() {
     await retrieveData(current_page.value)
-
 }
+
+
 </script>
 
 <template>
     <NavTabs eventType="low_level"></NavTabs>
+    <v-alert v-model="is_server_error" border="start" close-label="Close Alert" color="error" title="Error"
+        variant="tonal" closable>{{ server_error_msg }}</v-alert>
+    <v-row fluid class="mt-3" align="center" justify="center">
+        <v-sheet width="80vw" class="position-relative">
+            <v-overlay v-model="is_loading" class="align-center justify-center" contained> <v-progress-circular
+                    v-if="is_loading" color="primary" indeterminate size="100"></v-progress-circular>
+            </v-overlay>
+            <v-col align="center" justify="center">
+                <!-- Filter and sort submition -->
+                <!-- FIXME: Validate terms amount or display error from server and reenable -->
 
-    <h2> Current page: {{ current_page }}</h2>
-    <!-- Filter and sort submition -->
-    <!-- FIXME: Validate terms amount or display error from server and reenable -->
-    <v-form @submit.prevent="on_submit" ref="searchForm">
-        <h3> Search time, event type, source file path, evidence entry, or plugin. </h3>
-        <h2> NOTE: Use whole words for searching </h2>
-        <v-text-field v-model="include_terms" label="Include terms (whole words separated by space)"
-            :disabled="is_loading == 1"></v-text-field>
-        <v-text-field v-model="exclude_terms" label="Exclude terms (whole words separated by space)"
-            :disabled="is_loading == 1"></v-text-field>
-        <v-select v-model="is_ascending" label="Sort direction" :items="is_ascending_values"
-            :disabled="is_loading == 1"></v-select>
-        <v-select v-model="selected_column" label="Sort by column" :items="low_level_columns"
-            :disabled="is_loading == 1"></v-select>
-        <v-row>
-            <v-col><v-switch v-model="use_label" :disabled="is_loading == 1"
-                    :label="`Filter by a label?: ${(use_label) ? `Yes` : `No`}`"></v-switch></v-col>
+                <v-card variant="outlined" class="pa-1">
+                    <v-form @submit.prevent="on_submit" ref="searchForm">
+                        <h3> Search time, event type, source file path, evidence entry, plugin, raw entry, or keys. </h3>
+                        <h2> NOTE: Use whole words for searching </h2>
+                        <v-text-field v-model="include_terms" label="Include terms (whole words separated by space)"
+                            :disabled="is_loading == 1"></v-text-field>
+                        <v-text-field v-model="exclude_terms" label="Exclude terms (whole words separated by space)"
+                            :disabled="is_loading == 1"></v-text-field>
+                        <v-select v-model="is_ascending" label="Sort direction" :items="is_ascending_values"
+                            :disabled="is_loading == 1"></v-select>
+                        <v-select v-model="selected_column" label="Sort by column" :items="low_level_columns"
+                            :disabled="is_loading == 1"></v-select>
+                        <v-row>
+                            <v-col><v-switch v-model="use_label" :disabled="is_loading == 1"
+                                    :label="`Filter by a label?: ${(use_label) ? `Yes` : `No`}`"></v-switch></v-col>
 
-            <v-col><v-select v-model="selected_label" :disabled="is_loading == 1 || !use_label" label="Select label"
-                    :items="label_data" multiple chips></v-select></v-col>
-        </v-row>
-        <v-row>
-            <v-card>
-                <v-col>
-                    <v-col><v-switch v-model="use_time_range" :disabled="is_loading == 1"
-                            :label="`Filter by minimum date range?: ${(use_time_range) ? `Yes` : `No`}`"></v-switch></v-col>
-                </v-col>
-                <v-col>
-                    <v-input :rules="date_rules">
-                        <v-card subtitle="Start date">
-                            <SelectDateTime :disabled="is_loading == 1 || !use_time_range" ref="start_min_date">
-                            </SelectDateTime>
-                        </v-card>
-                        <v-card subtitle="End date">
-                            <SelectDateTime :disabled="is_loading == 1 || !use_time_range" ref="end_min_date">
-                            </SelectDateTime>
+                            <v-col><v-select v-model="selected_label" :disabled="is_loading == 1 || !use_label"
+                                    label="Select label" :items="label_data" multiple chips></v-select></v-col>
+                        </v-row>
+                        <v-row align="center" justify="center">
+                            <v-card>
+                                <v-col>
+                                    <v-col><v-switch v-model="use_time_range" :disabled="is_loading == 1"
+                                            :label="`Filter by minimum date range?: ${(use_time_range) ? `Yes` : `No`}`"></v-switch></v-col>
+                                </v-col>
+                                <v-col>
+                                    <v-input :rules="date_rules">
+                                        <v-card subtitle="Start date">
+                                            <SelectDateTime :disabled="is_loading == 1 || !use_time_range"
+                                                ref="start_min_date">
+                                            </SelectDateTime>
+                                        </v-card>
+                                        <v-card subtitle="End date">
+                                            <SelectDateTime :disabled="is_loading == 1 || !use_time_range"
+                                                ref="end_min_date">
+                                            </SelectDateTime>
 
-                        </v-card>
-                    </v-input>
+                                        </v-card>
+                                    </v-input>
 
-                </v-col>
-            </v-card>
-        </v-row>
-        <v-row>
-            <v-btn type="submit" class="mb-8" color="blue" size="large" variant="tonal" block
-                :disabled="is_loading == 1">
-                Search
-            </v-btn>
-            <DownloadDB></DownloadDB>
-        </v-row>
+                                </v-col>
+                            </v-card>
+                        </v-row>
+                        <v-row align="center" justify="center">
+                            <v-btn type="submit" class="ma-8 " color="blue" size="large" variant="tonal" block
+                                :disabled="is_loading == 1">
+                                Search
+                            </v-btn>
 
-        <!-- TODO: Search by label -->
-    </v-form>
-    <!-- NOTE: Button icons must use mdi icons manually, empty by default -->
-    <!-- Page navigation -->
-    <v-select v-model="current_page" label="Go to page:" :items="page_values" :disabled="is_loading == 1"
-        @update:modelValue="onPageChange"></v-select>
+                        </v-row>
 
-    <v-row>
-        <!-- Elements for comment editing -->
-        <v-btn @click="toggleComments" :disabled="selected_row == 0 || is_loading == 1"> Edit Comment </v-btn>
-        <UpdateComments @CloseWindow="on_submit" eventType="low_level" ref="comments_ref"></UpdateComments>
-        <!-- Elements for label editing -->
+                    </v-form>
+                </v-card>
+                <DownloadDB class="ma-2"></DownloadDB>
+                <!-- NOTE: Button icons must use mdi icons manually, empty by default -->
+                <!-- Page navigation -->
+                <v-select class="ma-2" v-model="current_page" label="Go to page:" :items="page_values"
+                    :disabled="is_loading == 1" @update:modelValue="onPageChange"></v-select>
 
-        <v-btn @click="toggleLabels" :disabled="selected_row == 0 || is_loading == 1"> Edit Labels </v-btn>
-        <CRUDLabels @CloseWindow="on_submit" @LabelsLoaded="loadLabels" eventType="low_level" ref="labels_ref">
-        </CRUDLabels>
+                <v-row class="ma-2" align="center" justify="center">
+                    <!-- Elements for comment editing -->
+                    <v-btn @click="toggleComments" :disabled="selected_row == 0 || is_loading == 1"> Edit Comment
+                    </v-btn>
+                    <UpdateComments @CloseWindow="on_submit" eventType="low_level" ref="comments_ref"></UpdateComments>
+                    <!-- Elements for label editing -->
+                    <v-spacer></v-spacer>
+                    <v-btn @click="toggleLabels" :disabled="selected_row == 0 || is_loading == 1"> Edit Labels </v-btn>
+                    <CRUDLabels @CloseWindow="on_submit" @LabelsLoaded="loadLabels" eventType="low_level"
+                        ref="labels_ref">
+                    </CRUDLabels>
 
+                </v-row>
+
+                <v-pagination v-model="current_page" :length="total_page" :total-visible="total_visible"
+                    show-first-last-page=true variant="outlined" @update:modelValue="onPageChange"
+                    :disabled="is_loading == 1"></v-pagination>
+                <div>
+                    <div class="mx-3" ref="data_table">
+
+                    </div>
+                </div>
+
+            </v-col>
+        </v-sheet>
     </v-row>
-
-    <v-pagination v-model="current_page" :length="total_page" :total-visible="total_visible" show-first-last-page=true
-        variant="outlined" @update:modelValue="on_submit" :disabled="is_loading == 1"></v-pagination>
-    <!-- TODO: Loading bar for data -->
-    <div>
-        <v-progress-circular v-if="is_loading" color="primary" indeterminate></v-progress-circular>
-        <div ref="data_table">
-
-        </div>
-    </div>
 
 </template>

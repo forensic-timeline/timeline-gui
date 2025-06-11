@@ -1,9 +1,9 @@
 # Functions to run DFTPL. Based on "dftpl.py" branch "python-analysers" (as of 03052025)
-from datetime import datetime
 from json import dump  # Dump to file
 from os.path import join  # Construct path name
 from os import remove
 from secrets import token_hex  # Generate random file name
+from flask.sessions import SessionMixin
 
 # Import all dftpl analysers by default
 # Update the list of usable analysers to match dftpl
@@ -11,7 +11,7 @@ from secrets import token_hex  # Generate random file name
 # 1. dictionary mapping of all analyser classes
 import dftpl.analyzers.useractivity.FileDownloads as FileDownloads
 import dftpl.analyzers.useractivity.RecentFileAccess as RecentFileAccess
-import dftpl.analyzers.useractivity.SoftwareInstallation as SoftwareInstallation
+# import dftpl.analyzers.useractivity.SoftwareInstallation as SoftwareInstallation
 import dftpl.analyzers.useractivity.USBConnectedRegDeviceClasses as USBConnectedRegDeviceClasses
 import dftpl.analyzers.useractivity.USBConnectedRegUSB as USBConnectedRegUSB
 import dftpl.analyzers.useractivity.USBConnectedRegUSBSTOR as USBConnectedRegUSBSTOR
@@ -19,7 +19,7 @@ import dftpl.analyzers.useractivity.USBConnectedWinevt as USBConnectedWinevt
 import dftpl.analyzers.useractivity.WindowsEventLogCleared as WindowsEventLogCleared
 import dftpl.analyzers.useractivity.WindowsFirewallDisabled as WindowsFirewallDisabled
 import dftpl.analyzers.web.AllImagesFromCache as AllImagesFromCache
-import dftpl.analyzers.web.AllVideoFromCache as AllVideoFromCache
+# import dftpl.analyzers.web.AllVideoFromCache as AllVideoFromCache
 import dftpl.analyzers.web.BingSearch as BingSearch
 import dftpl.analyzers.web.GoogleSearch as GoogleSearch
 import dftpl.analyzers.web.WebVisits as WebVisits
@@ -68,7 +68,7 @@ from app import current_app
 DEFAULT_analyser = {
     FileDownloads.description: FileDownloads,
     RecentFileAccess.description: RecentFileAccess,
-    SoftwareInstallation.description: SoftwareInstallation,
+    # SoftwareInstallation.description: SoftwareInstallation, # Disabled since bug in dftpl
     USBConnectedRegDeviceClasses.description: USBConnectedRegDeviceClasses,
     USBConnectedRegUSB.description: USBConnectedRegUSB,
     USBConnectedRegUSBSTOR.description: USBConnectedRegUSBSTOR,
@@ -76,7 +76,7 @@ DEFAULT_analyser = {
     WindowsEventLogCleared.description: WindowsEventLogCleared,
     WindowsFirewallDisabled.description: WindowsFirewallDisabled,
     AllImagesFromCache.description: AllImagesFromCache,
-    AllVideoFromCache.description: AllVideoFromCache,
+    # AllVideoFromCache.description: AllVideoFromCache, # Disabled since bug in dftpl
     BingSearch.description: BingSearch,
     GoogleSearch.description: GoogleSearch,
     WebVisits.description: WebVisits,
@@ -126,6 +126,7 @@ def generate_analysers_list():
 # Create and store timeline data in sqlite db
 # User can change the default name when they download it
 # FIXME: Catch error
+# HACK: Creates a session var for the loading status of dftpl
 def store_timelines(low_timeline: LowLevelTimeline, high_timeline: HighLevelTimeline):
     # Create DB using model
     
@@ -185,6 +186,8 @@ def store_timelines(low_timeline: LowLevelTimeline, high_timeline: HighLevelTime
     # TEST
     print("Lowlevelevents commited")
     # Iterate over high level events and write to DB
+    count = 1
+    progress_10k = 0
     for event in high_timeline.events:
         # Since dftpl id = index = which row as ordered in the csv file,
         # "autoincrement" primary key will assign the same id
@@ -231,6 +234,13 @@ def store_timelines(low_timeline: LowLevelTimeline, high_timeline: HighLevelTime
                 .filter(TLModel.LowLevelEvents.id == event_dict["id"])
                 .first()
             )
+        count += 1
+        # Commit before adding high level events and relationships
+        if count >= 10000:
+            progress_10k += 1
+            print(f"High level events: {progress_10k * count}")
+            count = 1
+            db_session.commit()
     # Save and close DB connection
     db_session.commit()
     print("Highlevelevents commited") # TEST
@@ -242,6 +252,7 @@ def store_timelines(low_timeline: LowLevelTimeline, high_timeline: HighLevelTime
     return 0
 
 # analysers_arr = List of names based on the analysers's description variable
+# HACK: Creates a session var for the loading status of dftpl
 def run_dftpl(input_file_path: str, analysers_arr: list[str]):
     # Read the CSV file
     print("Reading CSV file ...")

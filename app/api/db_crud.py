@@ -18,7 +18,7 @@ from app import current_app
 from app.api import api
 
 
-AMOUNT_IN_PAGE = 10  # Max events per page, 100k crashed tabulator
+AMOUNT_IN_PAGE = 100  # Max events per page, 100k crashed tabulator
 PAGES_AROUND = 1  # Max pages before and after current
 IS_ASCENDING_VALUES = {True: "ASC", False: "DESC"}
 IS_ASCENDING_SIGN = {True: ">", False: "<"}
@@ -49,22 +49,21 @@ TABLE_VALUES = {
             "event_type",
             "description",
             "category",
-            "reasoning desc",
-            "reasoning ref",
+            "reasoning_description",
+            "reasoning_reference",
+            "test_event_type",
+            "test_event_evidence",
+            "low_level_event_id"
         ],
     },
 }
 
 MAX_KEYWORDS = 10
+MAX_KEYWORD_LEN = 100
 
 # Definition of db URL string using session value
 def returnDBURL():
-    # TEST: TEST DB PATH
-    return (
-            "sqlite:///"
-            + r"D:\Moving\Documents\Universitas - MatKul\PraTA_TA_LaporanKP\TA"
-            + r"\Proj\dftpl_gui_proj\test\timeline_2_fts5_short_final_24052025.sqlite"
-        )
+
     return "sqlite:///" + join(
         current_app.config["UPLOAD_DIR"]
         + "\\"
@@ -169,7 +168,7 @@ def get_page_event(
             "INNER JOIN labels AS c ON b.labels_id = c.id "
             f"WHERE c.id IN ({", ".join(str(id) for id in filter_label)})")
     else:
-        stmt = f"SELECT COUNT(id) FROM {table_name}_events_idx WHERE 1=1"   
+        stmt = f"SELECT COUNT(id) FROM {table_name}_events_idx WHERE 1=1 {include_exclude}"   
 
 
 
@@ -181,7 +180,7 @@ def get_page_event(
         print(repr(e)) # FIXME
         return -1
     
-    cur_page = max_page if get_page > max_page else get_page  # Check max page requested
+    cur_page = max_page if get_page >= max_page else get_page  # Check max page requested
 
     # Create select and where statement before adding limit and id lookup
     # HACK: Using raw SQL so MATCH and id where statements on FTS5 table can be appended conditionally
@@ -201,7 +200,6 @@ def get_page_event(
     # NOTE: If ORDER BY is in nested SELECT, it won't trigger without LIMIT
     # THEORY: Due to SQLite's query optimizer
     # If first, sort by first then limit
-    print(sort_asc) # TEST
     # NOTE: Column names cannot be paramaterized!
     if cur_page <= 1:
         sub_stmt_2 = f"{sub_stmt_2} ORDER BY {sort_column} {IS_ASCENDING_VALUES[sort_asc]} LIMIT {AMOUNT_IN_PAGE}"
@@ -226,8 +224,7 @@ def get_page_event(
             "LEFT JOIN labels AS c ON b.labels_id = c.id "
         )
 
-    # INPROGRESS
-    # TODO: If high level, also retrieve keys by left join
+
     if table_name == "high_level":
         stmt_2 = (
             f"SELECT * FROM ({stmt_2}) " +
@@ -239,18 +236,17 @@ def get_page_event(
     # Stores in temp dict of {id: rowdata} 
     try:
         for row in db_session.execute(text(stmt_2), parameters).all():
-            print(row._asdict()) # TEST
             row_dict = row._asdict()
             # If given id already exists, append to list of label name and id
             # Since accessing value by key is O(1)
             # NOTE: JS Dict key values must be obj or string, so id is converted into string before returned
 
             if(row_dict["id"] in page_rows):
-                if row_dict["cid"]:
+                if row_dict["cid"] and row_dict["cid"] not in page_rows[row_dict["id"]]["cid"]:
                     page_rows[row_dict["id"]]["cid"].append(str(row_dict["cid"]))
-                if row_dict["cname"]:
+                if row_dict["cname"] and row_dict["cname"] not in page_rows[row_dict["id"]]["cname"]:
                     page_rows[row_dict["id"]]["cname"].append(row_dict["cname"])
-                if table_name == "high_level" and row_dict["key_name"]:
+                if table_name == "high_level" and row_dict["key_name"] and row_dict["key_name"] not in page_rows[row_dict["id"]]["key_name"]:
                     page_rows[row_dict["id"]]["key_name"].append(row_dict["key_name"])
 
             else:
@@ -277,82 +273,91 @@ def get_page_event(
 
 # Validates arguments and retrieves timeline data
 @api.route("/timeline/<string:event_type>", methods=["GET"])
-# @login_required # TEST
+@login_required
 def load_timeline(event_type):
-    # TODO: Replace with user's database session info
-    # TEST: Use test db to avoid processing with dftpl each test
-    database_uri = returnDBURL()
-    db_engine = create_engine(database_uri, echo=True) # TEST
-    db_session = scoped_session(
-        sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
-    )
-    # FIXME: Do input validation against acceptable values, return invalid request if failed
-    # FIXME: Catch ValueError
-    # FIXME: SANITIZE FILTER VALUES
-    # Get named URL parameters, sync with vue front end
+    if event_type in ["low_level", "high_level"]:
+        # TODO: Replace with user's database session info
+        # TEST: Use test db to avoid processing with dftpl each test
+        database_uri = returnDBURL()
+        db_engine = create_engine(database_uri, echo=True) # TEST
+        db_session = scoped_session(
+            sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
+        )
+        # FIXME: Do input validation against acceptable values, return invalid request if failed
+        # FIXME: Catch ValueError
+        # FIXME: SANITIZE FILTER VALUES
+        # Get named URL parameters, sync with vue front end
 
-    arg_include = request.args.get("include", default="", type=str).split()
-    arg_exclude = request.args.get("exclude", default="", type=str).split()
-    arg_asc = request.args.get("asc", default="true", type=str)
-    arg_bycol = request.args.get("byCol", default="id", type=str)
-    arg_cur_page = request.args.get("curPage", default=1, type=int)
-    arg_filter_label = "".join(request.args.get("filterLabel", default="", type=str).split()) # Remove whitespace for invalid
-    arg_min_date_range_list = loads(request.args.get("minDateRangeArr", default="", type=str)) # Remove whitespace for invalid
+        arg_include = request.args.get("include", default="", type=str).split()
+        arg_exclude = request.args.get("exclude", default="", type=str).split()
+        arg_asc = request.args.get("asc", default="true", type=str)
+        arg_bycol = request.args.get("byCol", default="id", type=str)
+        arg_cur_page = request.args.get("curPage", default=1, type=int)
+        arg_filter_label = "".join(request.args.get("filterLabel", default="", type=str).split()) # Remove whitespace for invalid
+        arg_min_date_range_list = loads(request.args.get("minDateRangeArr", default="", type=str)) # Remove whitespace for invalid
 
-    # Translates bool string to value
-    if arg_asc == "true":
-        arg_asc = True 
-    elif arg_asc == "false":
-        arg_asc = False
+        # Translates bool string to value
+        if arg_asc == "true":
+            arg_asc = True 
+        elif arg_asc == "false":
+            arg_asc = False
 
-    # Limit number of include and exclude to MAX_KEYWORDS strings
-    if len(arg_include) >= MAX_KEYWORDS or len(arg_exclude) >= MAX_KEYWORDS:
+        # Checks if term string is too long
+        for term in arg_include:
+            if len(term) >= MAX_KEYWORD_LEN:
+                return make_response(f"ERROR: Keyword too long, MAX: {MAX_KEYWORD_LEN} characters", 400)
+        for term in arg_exclude:
+            if len(term) >= MAX_KEYWORD_LEN:
+                return make_response(f"ERROR: Keyword too long, MAX: {MAX_KEYWORD_LEN} characters", 400)
+        # Limit number of include and exclude to MAX_KEYWORDS strings
+        if len(arg_include) >= MAX_KEYWORDS or len(arg_exclude) >= MAX_KEYWORDS:
+            db_session.remove()
+            db_engine.dispose()
+            return make_response(f"ERROR: Too many keywords, MAX: {MAX_KEYWORDS}", 400)
+        # Checks for invalid values
+        if (
+            arg_asc not in list(IS_ASCENDING_VALUES.keys())
+            or arg_bycol not in TABLE_VALUES[event_type]["columns"]
+            or not isinstance(arg_cur_page, int)
+        ):
+            db_session.remove()
+            db_engine.dispose()
+            return make_response("ERROR: Invalid Request", 400)
+        # Include and exclude strings doesn't need to be sanitized
+        # since not using raw sql commands so handled by SQLAlchemy
+
+
+        # Update valid values if needed
+
+        page_data = get_page_event(
+            db_session=db_session,
+            table_name=event_type,
+            filter_include=arg_include,
+            filter_exclude=arg_exclude,
+            sort_asc=arg_asc,
+            sort_column=arg_bycol,
+            get_page=arg_cur_page,
+            filter_label=loads(arg_filter_label or 'null'),
+            filter_min_date_range=arg_min_date_range_list
+        )
+        if isinstance(page_data, int) and page_data < 0:
+            db_session.remove()
+            db_engine.dispose()
+            return make_response("ERROR: Can't retrieve data", 500)
+        # Close DB Connections
+        # result.close()  # Close result proxy con
         db_session.remove()
         db_engine.dispose()
-        return make_response(f"ERROR: Too many keywords, MAX: {MAX_KEYWORDS}", 400)
-    # Checks for invalid values
-    if (
-        arg_asc not in list(IS_ASCENDING_VALUES.keys())
-        or arg_bycol not in TABLE_VALUES[event_type]["columns"]
-        or not isinstance(arg_cur_page, int)
-    ):
-        db_session.remove()
-        db_engine.dispose()
-        return make_response("ERROR: Invalid Request", 400)
-    # Include and exclude strings doesn't need to be sanitized
-    # since not using raw sql commands so handled by SQLAlchemy
-
-
-    # Update valid values if needed
-
-    page_data = get_page_event(
-        db_session=db_session,
-        table_name=event_type,
-        filter_include=arg_include,
-        filter_exclude=arg_exclude,
-        sort_asc=arg_asc,
-        sort_column=arg_bycol,
-        get_page=arg_cur_page,
-        filter_label=loads(arg_filter_label or 'null'),
-        filter_min_date_range=arg_min_date_range_list
-    )
-    if isinstance(page_data, int) and page_data < 0:
-        db_session.remove()
-        db_engine.dispose()
-        return make_response("ERROR: Can't retrieve data", 500)
-    # Close DB Connections
-    # result.close()  # Close result proxy con
-    db_session.remove()
-    db_engine.dispose()
-    return make_response(page_data, 200)
-
+        return make_response(page_data, 200)
+    else:
+        return make_response("", 404)
 
 # Keys API
 # INPROGRESS
 # Currently only used to retrieve keys from keys table for high level events
 # since low level events doesn't have separate key objects
 @api.route("/timeline/high_level/get_keys", methods=["GET"])
-#@login_required # TEST
+@login_required
 def get_high_level_keys():
     # Get row id from GET Args
     row_id = request.args.get("rowID", default=0, type=int)
@@ -364,11 +369,13 @@ def get_high_level_keys():
         sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
     )
     stmt = select(TLModel.Keys).where(TLModel.Keys.high_level_events_id == row_id)
-    
+
     try:
         for row in db_session.scalars(stmt).all():
             if isinstance(row, TLModel.Keys):
                 keys_data[row.key_name] = row.key_value
+        db_session.remove()
+        db_engine.dispose()
     except DBAPIError as e:
         print(repr(e)) # FIXME
         return make_response("ERROR: Invalid Request", 400)
@@ -381,7 +388,7 @@ def get_high_level_keys():
 # Comment APIs
 # Edit
 @api.route("/timeline/<string:event_type>/u_comments", methods=["POST"])
-# @login_required #TEST
+@login_required
 def update_comments(event_type):
     if event_type in ["low_level", "high_level"] and "rowID" in request.form and "comment" in request.form:
         if len(request.form["comment"]) > 200:
@@ -389,7 +396,7 @@ def update_comments(event_type):
         # TODO: Replace with user's database session info
         # TEST: Use test db to avoid processing with dftpl each test
         database_uri = returnDBURL()
-        db_engine = create_engine(database_uri)
+        db_engine = create_engine(database_uri, echo=True)
         db_session = scoped_session(
             sessionmaker(autocommit=False, autoflush=False, bind=db_engine, )
         )
@@ -417,5 +424,5 @@ def update_comments(event_type):
         db_engine.dispose()
         return make_response("", 200)
     else:
-        return make_response("", 400)
+        return make_response("", 404)
     

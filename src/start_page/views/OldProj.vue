@@ -5,7 +5,7 @@ import { ref, onMounted, watchEffect } from 'vue'
 // Validation for file size and type is handled by Dropzone
 import { Dropzone } from "@deltablot/dropzone"
 // Import component for getting hash of uploaded file
-import ConfirmIntegrity from '../components/ConfirmIntegrity.vue'
+import ConfirmUploadIntegrity from '../components/ConfirmUploadIntegrity.vue'
 
 // Dropzone
 const dropzoneRef = ref() // Ref to component where dropzone is initialized
@@ -95,34 +95,29 @@ watchEffect(() => {
 </script>
 
 <template>
-  <v-container fill-height>
-    <v-row align="center" justify="center">
-      <v-btn :to="{ name: 'start' }" variant="tonal">
-        Back
-      </v-btn>
-      <!-- 'multipart/form-data' Since a file is being uploaded.-->
-      <v-form ref="myForm" enctype="multipart/form-data" @submit.prevent="on_submit">
-        <v-col>
-          <v-row>
-            <div ref="dropzoneRef" class="dropzone">
-              <v-col>
-                <v-progress-linear v-if="is_upload" v-model="upload_progress" color="purple" height="25">
-                  <template v-slot:default="{ value }">
-                    <strong>{{ Math.ceil(value) }}%</strong>
-                  </template>
-                </v-progress-linear>
-              </v-col>
-              <v-col>
-                <v-btn type="submit">
-                  Upload
-                </v-btn>
-              </v-col>
-            </div>
-          </v-row>
-        </v-col>
-      </v-form>
-      <ConfirmIntegrity @CleanUpFinished="atCleanUp" v-if="is_success" ref="confirmIntegrity">
-      </ConfirmIntegrity>
-    </v-row>
-  </v-container>
+  <v-row fluid class="justify-center align-center">
+    <v-sheet height="80vh" width="80vw">
+      <v-col align="center" justify="center">
+        <v-btn :to="{ name: 'start' }" variant="tonal">
+          Back
+        </v-btn>
+        <!-- 'multipart/form-data' Since a file is being uploaded.-->
+        <v-form ref="myForm" enctype="multipart/form-data" @submit.prevent="on_submit">
+          <v-progress-linear v-if="is_upload" v-model="upload_progress" color="purple" height="25">
+            <template v-slot:default="{ value }">
+              <strong>{{ Math.ceil(value) }}%</strong>
+            </template>
+          </v-progress-linear>
+          <v-btn type="submit">
+            Upload
+          </v-btn>
+          <div ref="dropzoneRef" class="dropzone">
+          </div>
+        </v-form>
+        <ConfirmUploadIntegrity @CleanUpFinished="atCleanUp" v-if="is_success" ref="confirmIntegrity">
+        </ConfirmUploadIntegrity>
+      </v-col>
+    </v-sheet>
+  </v-row>
+
 </template>

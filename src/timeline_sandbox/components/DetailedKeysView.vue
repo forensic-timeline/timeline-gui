@@ -88,7 +88,7 @@ defineExpose({
         View Keys
         <v-dialog persistent activator="parent" @afterEnter="retrieveData">
             <template v-slot:default="{ isActive }">
-                <v-card :title="'Keys for event id: ' + rowID" class="pa-4">
+                <v-card :title="'Keys for event id: ' + rowID" class="pa-4" max-height="75vh">
                     <v-row>
                         <!-- Table to displays list of keys and values -->
                         <div ref="dataTableRef"></div>

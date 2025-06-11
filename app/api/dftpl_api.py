@@ -29,16 +29,21 @@ def get_analysers():
 
 
 @api.route("/run-dftpl", methods=["GET"])
-# @login_required #TEST
+@login_required
 def call_run_dftpl():
-    if run_dftpl(
+    if "session_db" in session:
+        return make_response("", 200)
+    # HACK: Creates a session var for the loading status of dftpl
+    elif "session_csv" in session:
+        if run_dftpl(
         join(
             current_app.config["UPLOAD_DIR"],
-            session["session_csv"],
-        ),
-        session["selected_analysers"]
-    ) < 0:
-        return make_response("ERROR: Failed to generate or to save timeline file.", 400)
+            session["session_csv"]
+            ),
+            session["selected_analysers"]
+        ) >= 0:
+            
+            return make_response("", 200)
+    return make_response("ERROR: Failed to generate or to save timeline file.", 400)
     # FIXME: Catch return if no high level timeline, show message
     # TODO: Delete csv if database is created successfuly
-    return make_response("", 200)

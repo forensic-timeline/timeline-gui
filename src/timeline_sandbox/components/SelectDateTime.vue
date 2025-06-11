@@ -52,7 +52,7 @@ defineExpose({
 });
 
 function onSubmit(isActive) {
-    formRef.value?.validate().then( ({ valid: isValid }) => {
+    formRef.value?.validate().then(({ valid: isValid }) => {
         if (isValid) {
             generateISOString()
             isActive.value = false
@@ -67,51 +67,54 @@ function onSubmit(isActive) {
         <v-dialog persistent activator="parent">
             <template v-slot:default="{ isActive }">
                 <v-form @submit.prevent="onSubmit(isActive)" ref="formRef">
-                    <v-card title="Set datetime" class="pa-4">
+                    <v-card class="pa-4">
+
                         <v-row>
-                            <v-col>
+                            <v-col align="center" justify="center">
                                 <v-card title="Set date">
-                                    <v-card subtitle="Year (0-9999)"><input type="number" v-model="year" class="w-75"
-                                            name="year" min="0" max="9999"></v-card>
-                                    <v-card subtitle="Month (0-12)"><input type="number" v-model="month" class="w-75"
+                                    <v-card subtitle="Year (0-9999)"><input type="number" v-model="year"
+                                            class="w-75 border border-b-lg rounded-lg" name="year" min="0" max="9999"></v-card>
+                                    <v-card subtitle="Month (0-12)"><input type="number" v-model="month" class="w-75 border border-b-lg rounded-lg"
                                             name="month" min="0" max="12"></v-card>
-                                    <v-card subtitle="Day (0-31)"><input type="number" v-model="day" class="w-75"
+                                    <v-card subtitle="Day (0-31)"><input type="number" v-model="day" class="w-75 border border-b-lg rounded-lg"
                                             name="day" min="0" max="31"></v-card>
                                 </v-card>
                             </v-col>
-                            <v-col>
+                            <v-col align="center" justify="center">
                                 <v-card title="Set time and UTC offset">
-                                    <v-card subtitle="Hour (0-23)"><input type="number" v-model="hour" class="w-75"
+                                    <v-card subtitle="Hour (0-23)"><input type="number" v-model="hour" class="w-75 border border-b-lg rounded-lg"
                                             name="hour" min="0" max="23"></v-card>
-                                    <v-card subtitle="Minute (0-59)"><input type="number" v-model="minute" class="w-75"
+                                    <v-card subtitle="Minute (0-59)"><input type="number" v-model="minute" class="w-75 border border-b-lg rounded-lg"
                                             name="minute" min="0" max="59"></v-card>
-                                    <v-card subtitle="Second (0-59)"><input type="number" v-model="second" class="w-75"
+                                    <v-card subtitle="Second (0-59)"><input type="number" v-model="second" class="w-75 border border-b-lg rounded-lg"
                                             name="second" min="0" max="59"></v-card>
                                     <v-card subtitle="Microsecond (0-999999)"><input type="number" v-model="microsecond"
-                                            class="w-75" name="microsecond" min="0" max="999999"></v-card>
+                                            class="w-75 border border-b-lg rounded-lg" name="microsecond" min="0" max="999999"></v-card>
                                     <v-card subtitle="UTC Offset hour (0-23)"><input type="number" v-model="offsetHour"
-                                            class="w-75" name="offsetHour" min="0" max="23"></v-card>
+                                            class="w-75 border border-b-lg rounded-lg" name="offsetHour" min="0" max="23"></v-card>
                                     <v-card subtitle="UTC Offset hour (0-59)"><input type="number"
-                                            v-model="offsetMinute" class="w-75" name="offsetMinute" min="0"
+                                            v-model="offsetMinute" class="w-75 border border-b-lg rounded-lg" name="offsetMinute" min="0"
                                             max="59"></v-card>
-                                    <v-select v-model="offsetSign" class="w-75" :items="offsetSignConst"
+                                    <v-card>
+                                        <v-select v-model="offsetSign" class="w-75" :items="offsetSignConst"
                                         label="Select offset type"
                                         hint="Is offset from UTC timezone positive or negative?"></v-select>
+                                    </v-card>
+
                                 </v-card>
                             </v-col>
                         </v-row>
                         <v-row><v-input :rules="ISORules"></v-input></v-row>
-                        <v-row>
-                            <v-col>
-                                <v-btn type="submit">
-                                    Set Datetime
-                                </v-btn>
-                            </v-col>
-                            <v-col>
-                                <v-btn @click="isActive.value = false;">
-                                    Cancel
-                                </v-btn>
-                            </v-col>
+                        <v-row align="center" justify="center">
+
+                            <v-btn type="submit" class="mx-2">
+                                Set Datetime
+                            </v-btn>
+
+                            <v-btn @click="isActive.value = false;" class="mx-2">
+                                Cancel
+                            </v-btn>
+
                         </v-row>
                     </v-card>
                 </v-form>

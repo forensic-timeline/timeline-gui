@@ -5,6 +5,7 @@ See `.flaskenv` for default settings.
 """
 
 import os, secrets
+from datetime import timedelta
 
 class Config(object):
     # If not set fall back to production for safety
@@ -53,3 +54,5 @@ class Config(object):
     )  # HACK: 5 GB Flask upload limit. Practical size 1 KB = 1024 B
     # Technically unused since dropzonejs has it's own chunked upload but
     # set just in case
+    # TEST 
+    PERMANENT_SESSION_LIFETIME = timedelta(days=31)

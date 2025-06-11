@@ -9,10 +9,6 @@
             "category": "User Activity"
         },
         {
-            "name": "Software Installed",
-            "category": "System"
-        },
-        {
             "name": "USB Device Connected (Registry DeviceClasses)",
             "category": "User Activity"
         },
@@ -38,10 +34,6 @@
         },
         {
             "name": "Cached Images",
-            "category": "Web"
-        },
-        {
-            "name": "Cached Video",
             "category": "Web"
         },
         {

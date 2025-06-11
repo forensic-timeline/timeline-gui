@@ -11,7 +11,7 @@ const isMainActive = ref(false)
 const mainFormRef = ref()
 
 const labelList = ref() // JSON dict of id:name, retrieved before mount
-const userSelectedLabels = ref() // New list of initial event label ids, modified by user
+const userSelectedLabels = ref([]) // New list of initial event label ids, modified by user
 let initialLabels = [] // Set of initial event label ids, given from event row
 // Vars for modifying label list
 const isLabelCRUDActive = ref(false)
@@ -27,14 +27,18 @@ const selectedLabel = ref(false) // An id of a label
 const newLabel = ref("") // New or existing label value
 // General vars
 const isProcessing = ref(false) // Prevent user activity while processing
+// Server error var
+const is_server_error = ref(false)
+const server_error_msg = ref("")
+
 
 // Character limit rules
-const name_rules = [v => v ? v.length <= 50 : true || 'Max 50 characters']
+const name_rules = [v => v ? v.length <= 50 && v.length > 0 : true || 'Max 50 characters']
 
 // TEST Rule if labels aren't changed
 const label_rule = [() => {
-    const setToDelete = initialLabels.filter(x => !userSelectedLabels.value.includes(x))
-    const setToAdd = userSelectedLabels.value.filter(x => !initialLabels.includes(x))
+    const setToDelete = userSelectedLabels.value != null ? initialLabels.filter(x => !userSelectedLabels.value.includes(x)) : false
+    const setToAdd = initialLabels != null ? userSelectedLabels.value.filter(x => !initialLabels.includes(x)) : false
     if (setToDelete.length > 0 || setToAdd.length > 0) {
         return true
     }
@@ -49,8 +53,8 @@ function toggle(id, currentLabels) {
     rowID.value = id
     isMainActive.value = true
     // Turns label list into dicts with boolean values for selected labels
-    userSelectedLabels.value = currentLabels
-    initialLabels = currentLabels
+    userSelectedLabels.value = currentLabels != null ? currentLabels : []
+    initialLabels = currentLabels != null ? currentLabels : []
     retrieveAllLabel()
 }
 
@@ -87,8 +91,8 @@ async function updateEventLabel() {
 
     mainFormRef.value?.validate().then(async ({ valid: isValid }) => {
         if (isValid) {
-            const setToDelete = initialLabels.filter(x => !userSelectedLabels.value.includes(x))
-            const setToAdd = userSelectedLabels.value.filter(x => !initialLabels.includes(x))
+            const setToDelete = userSelectedLabels.value != null ? initialLabels.filter(x => !userSelectedLabels.value.includes(x)) : []
+            const setToAdd = initialLabels != null ? userSelectedLabels.value.filter(x => !initialLabels.includes(x)) : []
 
             isProcessing.value = true
             // Sends form data to API
@@ -166,14 +170,17 @@ async function createNewLabel() {
                     }))
                     .then(res => {
                         if (res.status == 200) {
+                            isMainActive.value = false
+                            isLabelCRUDActive.value = false
+                            emit("CloseWindow") // Tell parent to change the  isActive value to false
                         }
                         else {
+                            is_server_error.value = true
+                            
+                            server_error_msg.value = res.data
                             // TODO: Handle server error
                         }
-                        isMainActive.value = false
-                        isLabelCRUDActive.value = false
                         isProcessing.value = false
-                        emit("CloseWindow") // Tell parent to change the  isActive value to false
                     }));
         }
     })
@@ -199,14 +206,17 @@ async function updateExistingLabel() {
                     }))
                     .then(res => {
                         if (res.status == 200) {
+                            isMainActive.value = false
+                            isLabelCRUDActive.value = false
+                            emit("CloseWindow") // Tell parent to change the  isActive value to false
                         }
                         else {
+                            is_server_error.value = true
+                            
+                            server_error_msg.value = res.data
                             // TODO: Handle server error
                         }
-                        isMainActive.value = false
-                        isLabelCRUDActive.value = false
                         isProcessing.value = false
-                        emit("CloseWindow") // Tell parent to change the  isActive value to false
                     }));
         }
     })
@@ -232,6 +242,7 @@ async function deleteExistingLabel() {
                 if (res.status == 200) {
                 }
                 else {
+                    
                     // TODO: Handle server error
                 }
                 isMainActive.value = false
@@ -256,21 +267,18 @@ defineExpose({
 <template>
     <v-dialog persistent v-model="isMainActive" width="50vw">
         <v-card :title="'Editing labels for event id: ' + rowID">
-            <v-form @submit.prevent="" ref="mainFormRef">
-                <v-row>
-                    <!-- TEST -->
-                    <p>Selected label for edit:{{ selectedLabel }}</p>
-                    <p>Selected label for checkbox: {{ userSelectedLabels }}</p>
+            <v-col align="center" justify="center"> <v-form @submit.prevent="" ref="mainFormRef">
                     <v-col>
                         <!-- To display no labels changed error -->
                         <v-input :rules="label_rule"></v-input>
-                        <v-sheet max-height="50vh" color="grey-lighten-1">
-                            <v-slide-group v-model="selectedLabel" selected-class="bg-success" show-arrows
-                                direction="vertical" max="1" prev-icon="mdi-arrow-up" next-icon="mdi-arrow-down">
+                        <v-sheet max-height="50vh" class="border border-b-lg rounded-lg">
+                            <v-slide-group v-model="selectedLabel" selected-class="bg-success" show-arrows="always"
+                                direction="vertical" max="1" prev-icon="fa-solid fa-arrow-up"
+                                next-icon="fa-solid fa-arrow-down">
                                 <!-- NOTE: Javascript dict keys must be obj or string, so cast id to number before searching on db -->
                                 <v-slide-group-item v-for="name, id in labelList" :key="id" :value="id"
                                     v-slot="{ isSelected, toggle, selectedClass }">
-                                    <v-card :disabled="isProcessing == 1" :class="['ma-4', selectedClass]"
+                                    <v-card :disabled="isProcessing == 1" :class="['my-4', selectedClass]"
                                         color="grey-lighten-1" rounded @click="toggle" width="200" height="50">
                                         <v-card-actions>
                                             <v-checkbox :disabled="isProcessing == 1" v-model="userSelectedLabels"
@@ -284,30 +292,33 @@ defineExpose({
                     </v-col>
 
                     <v-col>
-                        <!-- Buttons for label creation, updating, and deleting -->
-                        <!-- Disabled if no label is selected (slide group) -->
-                        <v-btn @click="onClickLabelOption(1)" :disabled="isProcessing == 1">
-                            New Label
-                        </v-btn>
-                        <v-btn @click="onClickLabelOption(2)" :disabled="isProcessing == 1 || !selectedLabel">
-                            Edit Selected Label
-                        </v-btn>
-                        <v-btn @click="onClickLabelOption(3)" :disabled="isProcessing == 1 || !selectedLabel">
-                            Delete Selected Label
-                        </v-btn>
+                        <v-row align="center" justify="center">
+                            <!-- Buttons for label creation, updating, and deleting -->
+                            <!-- Disabled if no label is selected (slide group) -->
+                            <v-btn @click="onClickLabelOption(1)" :disabled="isProcessing == 1">
+                                New Label
+                            </v-btn>
+                            <v-btn @click="onClickLabelOption(2)" :disabled="isProcessing == 1 || !selectedLabel">
+                                Edit Selected Label
+                            </v-btn>
+                            <v-btn @click="onClickLabelOption(3)" :disabled="isProcessing == 1 || !selectedLabel">
+                                Delete Selected Label
+                            </v-btn>
+                        </v-row>
+
 
                     </v-col>
-                </v-row>
-            </v-form>
-            <!-- Update selected event's label based on selected labels (checkbox) -->
-            <v-btn :disabled="isProcessing == 1" @click="updateEventLabel" type="submit" class="mb-8" color="blue"
-                size="large" variant="tonal" block>
-                Update event label
-            </v-btn>
-            <v-btn :disabled="isProcessing == 1" @click="isMainActive = false" class="mb-8" color="yellow" size="large"
-                variant="tonal" block>
-                Cancel
-            </v-btn>
+                </v-form>
+                <!-- Update selected event's label based on selected labels (checkbox) -->
+                <v-btn :disabled="isProcessing == 1" @click="updateEventLabel" type="submit" class="my-4"
+                    color="primary" size="large" variant="tonal" block>
+                    Update event label
+                </v-btn>
+                <v-btn :disabled="isProcessing == 1" @click="isMainActive = false" class="my-4" csize="large"
+                    variant="tonal" block>
+                    Cancel
+                </v-btn></v-col>
+
 
             <!-- Overlay for label create or selected label's update and delete -->
             <!-- NOTE: Javascript dict keys must be obj or string, so cast id to number before searching on db -->
@@ -316,18 +327,20 @@ defineExpose({
                 <!-- Done instead of modifying form content for readability -->
                 <!-- CREATE -->
                 <v-card v-if="operationType == 1" max-width="500" title="Create new label (max 50 characters)">
+                    <v-alert v-model="is_server_error" border="start" close-label="Close Alert" color="error"
+                        title="Error" variant="tonal" closable>{{ server_error_msg }}</v-alert>
                     <v-form @submit.prevent="createNewLabel" ref="labelCRUDFormRef">
                         <v-text-field :disabled="isProcessing == 1" v-model="newLabel" label="Label Name"
-                            clear-icon="mdi-close-circle" clearable :rules="name_rules" counter
+                            clear-icon="fa-solid fa-circle-xmark" clearable :rules="name_rules" counter
                             no-resize></v-text-field>
                         <!-- Label create -->
-                        <v-btn :disabled="isProcessing == 1" type="submit" class="mb-8" color="blue" size="large"
+                        <v-btn :disabled="isProcessing == 1" type="submit" class="my-4" color="primary" size="large"
                             variant="tonal" block>
                             Create new label
                         </v-btn>
                         <!-- Cancel button -->
-                        <v-btn :disabled="isProcessing == 1" @click="isLabelCRUDActive = false" class="mb-8"
-                            color="yellow" size="large" variant="tonal" block>
+                        <v-btn :disabled="isProcessing == 1" @click="isLabelCRUDActive = false" class="my-4"
+                            size="large" variant="tonal" block>
                             Cancel
                         </v-btn>
                     </v-form>
@@ -336,19 +349,20 @@ defineExpose({
                 <!-- UPDATE -->
                 <v-card v-else-if="operationType == 2" max-width="500"
                     :title="'Editing label: ' + labelList[selectedLabel]">
-
+                    <v-alert v-model="is_server_error" border="start" close-label="Close Alert" color="error"
+                        title="Error" variant="tonal" closable>{{ server_error_msg }}</v-alert>
                     <v-form @submit.prevent="updateExistingLabel" ref="labelCRUDFormRef">
                         <v-text-field :disabled="isProcessing == 1 || !selectedLabel" v-model="newLabel"
-                            label="Label Name" clear-icon="mdi-close-circle" clearable :rules="name_rules" counter
-                            no-resize></v-text-field>
+                            label="Label Name" clear-icon="fa-solid fa-circle-xmark" clearable :rules="name_rules"
+                            counter no-resize></v-text-field>
                         <!-- Label update -->
-                        <v-btn :disabled="isProcessing == 1 || !selectedLabel" type="submit" class="mb-8" color="blue"
-                            size="large" variant="tonal" block>
+                        <v-btn :disabled="isProcessing == 1 || !selectedLabel" type="submit" class="my-4"
+                            color="primary" size="large" variant="tonal" block>
                             Update label text
                         </v-btn>
                         <!-- Cancel button -->
-                        <v-btn :disabled="isProcessing == 1" @click="isLabelCRUDActive = false" class="mb-8"
-                            color="yellow" size="large" variant="tonal" block>
+                        <v-btn :disabled="isProcessing == 1" @click="isLabelCRUDActive = false" class="my-4"
+                            size="large" variant="tonal" block>
                             Cancel
                         </v-btn>
                     </v-form>
@@ -356,30 +370,30 @@ defineExpose({
 
                 <!-- DELETE -->
                 <v-card v-else-if="operationType == 3" max-width="500" title="Delete label">
-  
-                        <v-btn :disabled="isProcessing == 1 || !selectedLabel" class="mb-8" color="blue" size="large"
-                            variant="tonal" block>
-                            Delete label {{ labelList[selectedLabel] }}
-                            <v-dialog persistent activator="parent">
-                                <template v-slot:default="{ isActive }">
-                                    <v-card max-width="400"
-                                        text="Are you sure to delete the label? This process is irreversable!"
-                                        :title="'Confirm Deletion for ' + labelList[selectedLabel]">
-                                        <template v-slot:actions>
-                                            <v-btn @click="deleteExistingLabel" class="ml-auto" color="warning" text="Delete"></v-btn>
-                                            <v-btn class="ml-auto" text="Cancel"
-                                                @click="isActive.value = false"></v-btn>
-                                        </template>
-                                    </v-card>
-                                </template>
-                                <!-- TODO: Dialog box for confirmation -->
-                            </v-dialog>
-                        </v-btn>
-                        <!-- Cancel button -->
-                        <v-btn :disabled="isProcessing == 1" @click="isLabelCRUDActive = false" class="mb-8"
-                            color="yellow" size="large" variant="tonal" block>
-                            Cancel
-                        </v-btn>
+
+                    <v-btn :disabled="isProcessing == 1 || !selectedLabel" class="my-4" color="warning" size="large"
+                        variant="tonal" block>
+                        Delete label {{ labelList[selectedLabel] }}
+                        <v-dialog persistent activator="parent">
+                            <template v-slot:default="{ isActive }">
+                                <v-card max-width="400"
+                                    text="Are you sure to delete the label? This process is irreversable!"
+                                    :title="'Confirm Deletion for ' + labelList[selectedLabel]">
+                                    <template v-slot:actions>
+                                        <v-btn @click="deleteExistingLabel" class="ml-auto" color="warning"
+                                            text="Delete"></v-btn>
+                                        <v-btn class="ml-auto" text="Cancel" @click="isActive.value = false"></v-btn>
+                                    </template>
+                                </v-card>
+                            </template>
+                            <!-- TODO: Dialog box for confirmation -->
+                        </v-dialog>
+                    </v-btn>
+                    <!-- Cancel button -->
+                    <v-btn :disabled="isProcessing == 1" @click="isLabelCRUDActive = false" class="my-4" size="large"
+                        variant="tonal" block>
+                        Cancel
+                    </v-btn>
                 </v-card>
 
                 <!-- ERROR HANDLING -->

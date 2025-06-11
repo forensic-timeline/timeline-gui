@@ -173,7 +173,7 @@ def upload_file():
                                 ("ERROR: Unknown error reading csv.", 400)
                             )
 
-                        if len(spamreader.fieldnames) > 0:
+                        if len(spamreader.fieldnames) == len(DFTPL_CSV_COLUMNS):
                             for index, column in enumerate(spamreader.fieldnames):
                                 if column != DFTPL_CSV_COLUMNS[index]:
                                     # TEST
@@ -186,9 +186,9 @@ def upload_file():
                             file.stream.seek(
                                 SEEK_SET
                             )  # Return to beginning of stream after checking file content then save file.
-                            filename = token_hex(16) + secure_filename(
+                            filename = secure_filename(
                                 file.filename
-                            )  # Since new upload request = new file hash name
+                            ) + token_hex(16) + ".csv" # Since new upload request = new file hash name
                             # Store path to session to process csv and deleting afterwards
                             session["session_csv"] = filename
 
@@ -241,15 +241,7 @@ def upload_file():
                                     500,
                                 )
                             )
-
-                    # TODO: Move to it's own python file
-                    # Call function for database storage and DFTPL processing.
-                    # TODO: Handle passing analyser list to dftpl
-                    # Loop to read and sanitize rows into dftpl timeline object
-                    # If no row, return error.
-                    # If a row with missing column is detected, notify user (which row) and cancel process (delete db, csv)
-                    # Else, notify that process succeeds and pass timeline object to dftpl
-
+                    # Returns if middle chunk success
                     return make_response(("Chunk upload successful", 200))
 
                 # sqlite
@@ -277,7 +269,7 @@ def upload_file():
                             )  # Return to beginning of stream after reading the first 16 bytes
                             # Save the file
                             # Assuming file is split into chunks, loop to get all the chunks
-                            filename = token_hex(16) + secure_filename(file.filename)
+                            filename = secure_filename(file.filename) + token_hex(16) + ".sqlite"
                             session["session_db"] = filename  # To reuse later
                         else:
                             return make_response(("ERROR: Invalid sqlite file!", 400))
@@ -320,7 +312,7 @@ def upload_file():
                             + "\\"
                             + f"{session['session_db']}"
                         )
-                        engine = create_engine(database_uri)
+                        engine = create_engine(database_uri, echo=True)
 
                         # TODO: CATCH DB Corruptions
 
@@ -334,7 +326,8 @@ def upload_file():
                         result = db_session.execute(text(query))
 
                         for index, row in enumerate(result):
-                            if SCHEMA_TABLE_SQL_VAL[index] != row[0]:
+                            if "".join(SCHEMA_TABLE_SQL_VAL[index].split()) != "".join(row[0].split()):
+                                print(row[0]) # TEST
                                 # Do these 3 to close DB connections
                                 result.close()  # Close result proxy con
                                 db_session.remove()
@@ -357,7 +350,7 @@ def upload_file():
                         engine.dispose()
                         # Clean session value
                         return make_response(("File upload successful", 200))
-
+                    # Returns if middle chunk success
                     return make_response(("Chunk upload successful", 200))
                 else:
                     return make_response(("ERROR: Invalid file!", 400))
@@ -383,7 +376,7 @@ def confirm_hash(operation):
         elif operation == "download":
             file_name = session["session_db"]
         else:
-            return make_response("", 400)
+            return make_response("", 404)
         if request.method == "GET":
             try:
                 h_sha256 = sha256()
@@ -424,7 +417,7 @@ def undo_upload():
 @api.route("/download_db", methods=["GET"])
 # TODO: Add integrity hash check after file is downloaded, give user option to redo if corrupted.
 # TEST: Testing
-# @login_required
+@login_required
 def download_file():
     if request.method == "GET":
         return send_from_directory(current_app.config["UPLOAD_DIR"], session['session_db'], as_attachment=True)

@@ -95,9 +95,9 @@ def sign_in():
             )
             if user is None or not user.check_password(request.json["password"]):
                 return make_response("Wrong username or password!", 400)
-            if current_user.is_authenticated:
-                return make_response("Please log out from your first browser first!", 400)
             login_user(user)
+            session.permanent = True # HACK: Make session permanent for (default) 31 days
+            # NOTE: This means user must manually logout to erase their files
             # TODO: Redirect to project upload
             return make_response("Account created!", 200)
 
@@ -131,8 +131,6 @@ def logout():
 # NOTE: Doesn't get called when program terminates, only when user logs out
 # TODO: Clean up when program terminates (clean folder instead on individual files)
 # FIXME: Logging
-@api.route("/cleanup", methods=["GET"])
-@login_required
 def clean_up(app=None, user=None, csv=True, db=True):
     print(f"Cleaning files") # HACK
     try:
@@ -171,7 +169,7 @@ def sign_up():
             user.set_password(request.json["password"])
             db.session.add(user)
             db.session.commit()
-            login_user(user)
+            sign_in()
             return make_response("Successfully signed in!", 200)
     except (validators.StopValidation, validators.ValidationError) as e:
         # FIXME: LOGGING

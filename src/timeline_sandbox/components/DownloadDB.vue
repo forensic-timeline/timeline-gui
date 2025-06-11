@@ -1,7 +1,7 @@
 <script setup>
 // TODO: Show user minutes since last download
 import { ref, useTemplateRef } from 'vue'
-import ConfirmIntegrity from './ConfirmIntegrity.vue';
+import ConfirmDownloadIntegrity from './ConfirmDownloadIntegrity.vue';
 
 const integrityRef= useTemplateRef("integrityRef")
 
@@ -39,11 +39,11 @@ async function downloadDB(){
             <template v-slot:default="{ isActive }" >
                 <v-card title="Save Database File to Device" class="pa-4">
                     <v-row>
-                        <ConfirmIntegrity ref="integrityRef"></ConfirmIntegrity>
+                        <ConfirmDownloadIntegrity ref="integrityRef"></ConfirmDownloadIntegrity>
                     </v-row>
-                    <v-row>
-                        <v-btn @click="downloadDB">Save</v-btn>
-                        <v-btn @click="isActive.value = false;">Close</v-btn>
+                    <v-row class="mt-3" align="center" justify="center">
+                        <v-btn @click="downloadDB" class="mx-2">Save</v-btn>
+                        <v-btn @click="isActive.value = false;" class="mx-2">Close</v-btn>
                     </v-row>
                 </v-card>
             </template>

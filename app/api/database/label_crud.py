@@ -22,22 +22,19 @@ from sqlalchemy.exc import DBAPIError
 
 
 import app.model.timeline_model as TLModel
+from app.api.db_crud import returnDBURL
 from app import current_app
 from app.api import api
 
 
 # Retrieve labels as a dict of {id: name}
 @api.route("/timeline/get_labels", methods=["GET"])
-# @login_required
+@login_required
 # TEST: Add auth later
 def get_labels():
     # TODO: Replace with user's database session info
     # TEST: Use test db to avoid processing with dftpl each test
-    database_uri = (
-        "sqlite:///"
-        + r"D:\Moving\Documents\Universitas - MatKul\PraTA_TA_LaporanKP\TA"
-        + r"\Proj\dftpl_gui_proj\test\timeline_2_fts5_short_12052025.sqlite"
-    )
+    database_uri = returnDBURL()
     db_engine = create_engine(database_uri, echo=True)
     db_session = scoped_session(
         sessionmaker(
@@ -66,7 +63,7 @@ def get_labels():
     return make_response({"labels": label_dict}, 200)
 
 @api.route("/timeline/add_label", methods=["POST"])
-# @login_required
+@login_required
 # TEST: Add auth later
 def add_label():
     if (
@@ -76,11 +73,7 @@ def add_label():
     ):
         # TODO: Replace with user's database session info
         # TEST: Use test db to avoid processing with dftpl each test
-        database_uri = (
-            "sqlite:///"
-            + r"D:\Moving\Documents\Universitas - MatKul\PraTA_TA_LaporanKP\TA"
-            + r"\Proj\dftpl_gui_proj\test\timeline_2_fts5_short_12052025.sqlite"
-        )
+        database_uri = returnDBURL()
         db_engine = create_engine(database_uri, echo=True)
         db_session = scoped_session(
             sessionmaker(
@@ -104,11 +97,11 @@ def add_label():
         db_engine.dispose()
         return make_response("", 200)
     else:
-        return make_response("", 400)
+        return make_response("Invalid Label Name/Request", 400)
     
 
 @api.route("/timeline/update_label", methods=["POST"])
-# @login_required
+@login_required
 # TEST: Add auth later
 def update_label():
     if ("selectedLabel" in request.form and 
@@ -119,14 +112,10 @@ def update_label():
         try:
             label_id = int(request.form["selectedLabel"])
         except ValueError as e:
-            return make_response("", 400)
+            return make_response("Please select a label", 400)
         # TODO: Replace with user's database session info
         # TEST: Use test db to avoid processing with dftpl each test
-        database_uri = (
-            "sqlite:///"
-            + r"D:\Moving\Documents\Universitas - MatKul\PraTA_TA_LaporanKP\TA"
-            + r"\Proj\dftpl_gui_proj\test\timeline_2_fts5_short_12052025.sqlite"
-        )
+        database_uri = returnDBURL()
         db_engine = create_engine(database_uri, echo=True)
         db_session = scoped_session(
             sessionmaker(
@@ -150,11 +139,11 @@ def update_label():
         db_engine.dispose()
         return make_response("", 200)
     else:
-        return make_response("", 400)
+        return make_response("Invalid Label Name/Request", 400)
 
 # Retrieve labels as a dict of {id: name}
 @api.route("/timeline/delete_label", methods=["POST"])
-# @login_required
+@login_required
 # TEST: Add auth later
 def delete_label():
     if ("selectedLabel" in request.form
@@ -165,11 +154,7 @@ def delete_label():
             return make_response("", 400)
         # TODO: Replace with user's database session info
         # TEST: Use test db to avoid processing with dftpl each test
-        database_uri = (
-            "sqlite:///"
-            + r"D:\Moving\Documents\Universitas - MatKul\PraTA_TA_LaporanKP\TA"
-            + r"\Proj\dftpl_gui_proj\test\timeline_2_fts5_short_12052025.sqlite"
-        )
+        database_uri = returnDBURL()
         db_engine = create_engine(database_uri, echo=True)
         db_session = scoped_session(
             sessionmaker(
@@ -197,7 +182,7 @@ def delete_label():
 
 # Update label timeline many to many relationships
 @api.route("/timeline/<string:event_type>/u_labels", methods=["POST"])
-# @login_required``
+@login_required
 # TEST: Add auth later
 def update_event_labels(event_type):
     if (
@@ -211,11 +196,7 @@ def update_event_labels(event_type):
         set_to_add = loads(request.form["setToAdd"])
         # TODO: Replace with user's database session info
         # TEST: Use test db to avoid processing with dftpl each test
-        database_uri = (
-            "sqlite:///"
-            + r"D:\Moving\Documents\Universitas - MatKul\PraTA_TA_LaporanKP\TA"
-            + r"\Proj\dftpl_gui_proj\test\timeline_2_fts5_short_12052025.sqlite"
-        )
+        database_uri = returnDBURL()
         db_engine = create_engine(database_uri, echo=True)  # TEST
         db_session = scoped_session(
             sessionmaker(

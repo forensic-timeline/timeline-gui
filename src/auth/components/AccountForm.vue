@@ -105,29 +105,26 @@ const visible2 = ref(false)
 <template>
     <v-form ref="myForm" @submit.prevent="on_submit" >
         <v-container fluid>
-            <v-row>
+            <v-row align="center" justify="center">
                 <v-col cols="12" sm="6">
                     <div class="text-subtitle-1 text-medium-emphasis">Username</div>
 
                     <v-text-field v-model="username" :rules="usernameRules" density="compact" placeholder="Username"
-                        prepend-inner-icon="mdi-email-outline" variant="outlined" autocomplete="username"></v-text-field>
+                        prepend-inner-icon="fa-solid fa-user" variant="outlined" autocomplete="username"></v-text-field>
 
-                    <div class="text-subtitle-1 text-medium-emphasis d-flex align-center justify-space-between">
+                    <div class="text-subtitle-1 text-medium-emphasis">
                         Password
 
-                        <a class="text-caption text-decoration-none text-blue" href="#" rel="noopener noreferrer"
-                            target="_blank">
-                            Forgot login password?</a>
                     </div>
 
                     <v-text-field v-model="password" :rules="passwordRules"
-                        :append-inner-icon="visible1 ? 'mdi-eye-off' : 'mdi-eye'" :type="visible1 ? 'text' : 'password'"
-                        density="compact" placeholder="Enter your password" prepend-inner-icon="mdi-lock-outline"
+                        :append-inner-icon="visible1 ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'" :type="visible1 ? 'text' : 'password'"
+                        density="compact" placeholder="Enter your password" prepend-inner-icon="fa-solid fa-lock"
                         variant="outlined" @click:append-inner="visible1 = !visible1" :autocomplete="is_sign_up ? 'new-password' : 'current-password'"></v-text-field>
 
                     <v-text-field v-if="is_sign_up" v-model="confirm" :rules="confirmRules"
-                        :append-inner-icon="visible2 ? 'mdi-eye-off' : 'mdi-eye'" :type="visible2 ? 'text' : 'password'"
-                        density="compact" placeholder="Confirm your password" prepend-inner-icon="mdi-lock-outline"
+                        :append-inner-icon="visible2 ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye'" :type="visible2 ? 'text' : 'password'"
+                        density="compact" placeholder="Confirm your password" prepend-inner-icon="fa-solid fa-lock"
                         variant="outlined" @click:append-inner="visible2 = !visible2" autocomplete="new-password"></v-text-field>
                     <!-- Depends on is_sign_in -->
                     <v-btn v-if="is_sign_up" type="submit" class="mb-8" color="blue" size="large"

@@ -5,7 +5,7 @@ import { ref, onMounted, watchEffect } from 'vue'
 // Validation for file size and type is handled by Dropzone
 import { Dropzone } from "@deltablot/dropzone"
 // Import component for getting hash of uploaded file
-import ConfirmIntegrity from '../components/ConfirmIntegrity.vue'
+import ConfirmUploadIntegrity from '../components/ConfirmUploadIntegrity.vue'
 
 const selected_analysers = ref([])
 const analyser_list = ref([])
@@ -21,7 +21,7 @@ const is_upload = ref(false)
 const is_success = ref(false)
 const upload_progress = ref()
 
-// Ref to ConfirmIntegrity component
+// Ref to ConfirmUploadIntegrity component
 const confirmIntegrity = ref()
 
 // Client-side validation using vuetify array of rule functions
@@ -91,7 +91,7 @@ onMounted(async () => {
     formData.append('analysers', JSON.stringify(selected_analysers.value))
     is_upload.value = true
   })
-  // Show ConfirmIntegrity component
+  // Show ConfirmUploadIntegrity component
   myDropzone.on("success", function () {
     is_success.value = true
   })
@@ -123,56 +123,50 @@ watchEffect(() => {
 </script>
 
 <template>
-  <v-container fluid fill-height>
-    <v-col align="center" justify="center">
-      <v-btn :to="{ name: 'start' }" variant="tonal">
-        Back
-      </v-btn>
-      <!-- analyser Select
+  <v-row fluid class="justify-center align-center">
+    <v-sheet height="80vh" width="80vw">
+      <v-col align="center" justify="center">
+        <v-btn :to="{ name: 'start' }" variant="tonal">
+          Back
+        </v-btn>
+        <!-- analyser Select
           
       TODO: analyser search, select/deselect all, grouping, and integrate to actual submitable form.
       -->
-      <!-- 'multipart/form-data' Since a file is being uploaded.-->
-      <!-- TEST DROPZONE -->
-      <v-form ref="myForm" enctype="multipart/form-data" @submit.prevent="on_submit">
-        <v-row>
-          <v-container fluid>
-            <!-- For displaying error value for analysers -->
-            <v-input :rules="analyser_list_rule">
-              <v-virtual-scroll :height="300" :items="analyser_list">
-                <template v-slot:default="{ item }">
-                  <!-- Prevent user from changing analyser list while file is uploaded -->
-                  <v-checkbox v-model="selected_analysers" :label="item['name']" :value="item['name']"
-                    :disabled="is_upload == 1"></v-checkbox>
-                </template>
-              </v-virtual-scroll>
-            </v-input>
+        <!-- 'multipart/form-data' Since a file is being uploaded.-->
+        <!-- TEST DROPZONE -->
+        <v-form ref="myForm" enctype="multipart/form-data" @submit.prevent="on_submit">
+          <v-row>
+            <v-container fluid>
+              <!-- For displaying error value for analysers -->
+              <v-input :rules="analyser_list_rule">
+                <v-virtual-scroll :height="300" :items="analyser_list">
+                  <template v-slot:default="{ item }">
+                    <!-- Prevent user from changing analyser list while file is uploaded -->
+                    <v-checkbox v-model="selected_analysers" :label="item['name']" :value="item['name']"
+                      :disabled="is_upload == 1"></v-checkbox>
+                  </template>
+                </v-virtual-scroll>
+              </v-input>
 
-            <p>{{ selected }}</p>
-          </v-container>
-        </v-row>
-        <div ref="dropzoneRef" class="dropzone">
-          <v-col>
-            <!-- <v-file-input v-model="file_value" label="Upload a plaso timeline (default .csv output)" accept=".csv"
-              :rules="file_rule" name=file>
+              
+            </v-container>
+          </v-row>
+          <v-progress-linear v-if="is_upload" v-model="upload_progress" color="purple" height="25">
+            <template v-slot:default="{ value }">
+              <strong>{{ Math.ceil(value) }}%</strong>
+            </template>
+          </v-progress-linear>
+          <v-btn type="submit">
+            Upload
+          </v-btn>
+          <div ref="dropzoneRef" class="dropzone">
+          </div>
+        </v-form>
+        <ConfirmUploadIntegrity @CleanUpFinished="atCleanUp" v-if="is_success" ref="confirmIntegrity">
+        </ConfirmUploadIntegrity>
+      </v-col>
+    </v-sheet>
+  </v-row>
 
-            </v-file-input> -->
-
-            <v-progress-linear v-if="is_upload" v-model="upload_progress" color="purple" height="25">
-              <template v-slot:default="{ value }">
-                <strong>{{ Math.ceil(value) }}%</strong>
-              </template>
-            </v-progress-linear>
-          </v-col>
-          <v-col>
-            <v-btn type="submit">
-              Upload
-            </v-btn>
-          </v-col>
-        </div>
-      </v-form>
-      <ConfirmIntegrity @CleanUpFinished="atCleanUp" v-if="is_success" ref="confirmIntegrity">
-      </ConfirmIntegrity>
-    </v-col>
-  </v-container>
 </template>

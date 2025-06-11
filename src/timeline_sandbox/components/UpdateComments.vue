@@ -13,7 +13,9 @@ const rowID = ref()
 const isActive = ref(false)
 const commentValue = ref("")
 const isProcessing = ref(false) // Prevent user activity while processing
-
+// Server error var
+const is_server_error = ref(false)
+const server_error_msg = ref("")
 // Character limit rules
 const rules = [v => v ? v.length <= 200 : true || 'Max 200 characters']
 
@@ -44,13 +46,16 @@ async function updateComments() {
                     }))
                     .then(res => {
                         if (res.status == 200) {
+                            isActive.value = false
+                            
+                            emit("CloseWindow") // Tell parent to change the  isActive value to false
                         }
                         else {
+                            is_server_error.value = true
+                            server_error_msg.value = res.data
                             // TODO: Handle server error
                         }
-                        isActive.value = false
                         isProcessing.value = false
-                        emit("CloseWindow") // Tell parent to change the  isActive value to false
                     }));
         }
     })
@@ -65,9 +70,11 @@ defineExpose({
 <template>
     <v-dialog persistent v-model="isActive" width="auto">
         <v-card max-width="500" :title="'Editing comment for event id: ' + rowID">
+            <v-alert v-model="is_server_error" border="start" close-label="Close Alert" color="error"
+            title="Error" variant="tonal" closable>{{ server_error_msg }}</v-alert>
             <v-form @submit.prevent="updateComments" ref="myForm">
                 <v-textarea :disabled="isProcessing == 1" v-model="commentValue" label="Edit Comments"
-                    clear-icon="mdi-close-circle" clearable :rules="rules" counter no-resize>
+                    clear-icon="fa-solid fa-circle-xmark" clearable :rules="rules" counter no-resize>
                 </v-textarea>
                 <v-btn :disabled="isProcessing == 1" type="submit" class="mb-8" color="blue" size="large"
                     variant="tonal" block>
