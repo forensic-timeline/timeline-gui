@@ -9,7 +9,7 @@ from flask.sessions import SessionMixin
 # Update the list of usable analysers to match dftpl
 # TODO: Add a function in dftpl to generate:
 # 1. dictionary mapping of all analyser classes
-import dftpl.analyzers.useractivity.FileDownloads as FileDownloads
+# import dftpl.analyzers.useractivity.FileDownloads as FileDownloads
 import dftpl.analyzers.useractivity.RecentFileAccess as RecentFileAccess
 # import dftpl.analyzers.useractivity.SoftwareInstallation as SoftwareInstallation
 import dftpl.analyzers.useractivity.USBConnectedRegDeviceClasses as USBConnectedRegDeviceClasses
@@ -66,7 +66,7 @@ from app import current_app
 
 # Default analysers list, made a const for multiple functions
 DEFAULT_analyser = {
-    FileDownloads.description: FileDownloads,
+    # FileDownloads.description: FileDownloads,
     RecentFileAccess.description: RecentFileAccess,
     # SoftwareInstallation.description: SoftwareInstallation, # Disabled since bug in dftpl
     USBConnectedRegDeviceClasses.description: USBConnectedRegDeviceClasses,

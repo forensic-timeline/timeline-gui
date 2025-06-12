@@ -1,10 +1,6 @@
 {
     "analysers-list": [
         {
-            "name": "File Downloaded",
-            "category": "User Activity"
-        },
-        {
             "name": "Recent File Access",
             "category": "User Activity"
         },

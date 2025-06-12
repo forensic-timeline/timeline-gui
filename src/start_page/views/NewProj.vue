@@ -55,6 +55,16 @@ function on_submit() {
   })
 }
 
+function select_all() {
+  for (const [key, value] of Object.entries(analyser_list.value)) {
+    selected_analysers.value.push(value["name"])
+  }
+}
+
+function deselect_all() {
+  selected_analysers.value = []
+}
+
 onMounted(async () => {
   await load_analyser_list()
   // Initialize Dropzone
@@ -131,7 +141,7 @@ watchEffect(() => {
         </v-btn>
         <!-- analyser Select
           
-      TODO: analyser search, select/deselect all, grouping, and integrate to actual submitable form.
+      TODO: select/deselect all
       -->
         <!-- 'multipart/form-data' Since a file is being uploaded.-->
         <!-- TEST DROPZONE -->
@@ -140,16 +150,26 @@ watchEffect(() => {
             <v-container fluid>
               <!-- For displaying error value for analysers -->
               <v-input :rules="analyser_list_rule">
-                <v-virtual-scroll :height="300" :items="analyser_list">
-                  <template v-slot:default="{ item }">
-                    <!-- Prevent user from changing analyser list while file is uploaded -->
-                    <v-checkbox v-model="selected_analysers" :label="item['name']" :value="item['name']"
-                      :disabled="is_upload == 1"></v-checkbox>
-                  </template>
-                </v-virtual-scroll>
+                <v-col>
+                  <v-row>
+                    <v-btn :disabled="is_upload == 1" @click="select_all">Select all</v-btn>
+                    <v-btn :disabled="is_upload == 1" @click="deselect_all">Deselect all</v-btn>
+                  </v-row>
+                  <v-row>
+                    <v-virtual-scroll :height="300" :items="analyser_list">
+                      <template v-slot:default="{ item }">
+                        <!-- Prevent user from changing analyser list while file is uploaded -->
+                        <v-checkbox v-model="selected_analysers" :label="item['name']" :value="item['name']"
+                          :disabled="is_upload == 1"></v-checkbox>
+                      </template>
+                    </v-virtual-scroll>
+                  </v-row>
+                </v-col>
+
+
               </v-input>
 
-              
+
             </v-container>
           </v-row>
           <v-progress-linear v-if="is_upload" v-model="upload_progress" color="purple" height="25">

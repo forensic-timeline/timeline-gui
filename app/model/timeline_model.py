@@ -65,17 +65,17 @@ SCHEMA_TABLE_SQL_VAL = [
 		name VARCHAR NOT NULL,
 		PRIMARY KEY (id)
 )""",
-    """CREATE TABLE "labels_high_level_events" (
-		"labels_id"	INTEGER NOT NULL,
-		"high_level_events_id"	INTEGER NOT NULL,
-		FOREIGN KEY("high_level_events_id") REFERENCES "high_level_events"("id") ON DELETE CASCADE,
-		FOREIGN KEY("labels_id") REFERENCES "labels"("id") ON DELETE CASCADE
+    """CREATE TABLE labels_high_level_events (
+	labels_id INTEGER NOT NULL, 
+	high_level_events_id INTEGER NOT NULL, 
+	FOREIGN KEY(labels_id) REFERENCES labels (id) ON DELETE CASCADE, 
+	FOREIGN KEY(high_level_events_id) REFERENCES high_level_events (id) ON DELETE CASCADE
 )""",
-    """CREATE TABLE "labels_low_level_events" (
-	"labels_id"	INTEGER NOT NULL,
-	"low_level_events_id"	INTEGER NOT NULL,
-	FOREIGN KEY("labels_id") REFERENCES "labels"("id") ON DELETE CASCADE,
-	FOREIGN KEY("low_level_events_id") REFERENCES "low_level_events"("id") ON DELETE CASCADE
+    """CREATE TABLE labels_low_level_events (
+	labels_id INTEGER NOT NULL, 
+	low_level_events_id INTEGER NOT NULL, 
+	FOREIGN KEY(labels_id) REFERENCES labels (id) ON DELETE CASCADE, 
+	FOREIGN KEY(low_level_events_id) REFERENCES low_level_events (id) ON DELETE CASCADE
 )""",
     """CREATE TABLE low_level_events (
 		id INTEGER NOT NULL,

@@ -125,7 +125,8 @@ const total_page = ref(10) //Total page length, calculated by db
 const total_visible = ref(5)
 // Selected row's data by tabulator
 const selected_row = ref(false)
-
+// HACK: Event to call when page number changes
+const page_num_changed = new Event("page_num_changed")
 
 // retrieveData: Retrieve paginated data asynchronously
 // Uses GET, example like sciencedirect.com
@@ -236,17 +237,26 @@ onMounted(async () => {
     current_page.value = (typeof +props.goToPage === "number" && !isNaN(+props.goToPage)) ? +props.goToPage : current_page.value
     await retrieveData(current_page.value)
 
+    // Reload when page number is changed
+    addEventListener("page_num_changed", async () => {
+        // If user wants to go to a specific page, send here
+        await retrieveData(current_page.value)
+    })
+
 })
 
-// If page changed, assigns new page value
-watch (() => {
+// If props changed, assigns new page value and call event for retrieveData
+// since if retrieveData is watched, any changes to search form values
+// will trigger it
+
+
+watch ( props, async () => {
     current_page.value = (typeof +props.goToPage === "number" && !isNaN(+props.goToPage)) ? +props.goToPage : current_page.value
-})
-// Then reload
-watch( async () => {
-    // If user wants to go to a specific page, send here
-    console.log("RUN!") // TEST
-    await retrieveData(current_page.value)
+    dispatchEvent(page_num_changed)
+    console.log([
+        current_page.value,
+        props.goToPage
+    ]) // TEST
 })
 
 // TEST: Testing pagination events
