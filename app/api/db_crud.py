@@ -130,21 +130,21 @@ def get_page_event(
     if len(filter_include) > 0:
         param_id = []
         for index, word in enumerate(filter_include):
-            param_id.append(f'||:inc{index}') # Concatenate so arg bindings will work
+            param_id.append(f' :inc{index} ') # Concatenate so arg bindings will work
             parameters[f"inc{index}"] = f"\"{word}\"" # To escape characters like '$'
         include_exclude = include_exclude + (f" AND {table_name}_events_idx.id IN "
                                              f"(SELECT id FROM {table_name}_events_idx WHERE {table_name}_events_idx"
-                                             f" MATCH \'{{{column_filter}}} : \'{" ".join(param_id)})"
+                                             f" MATCH \'{{{column_filter}}} : \'|| {"||\" OR \"||".join(param_id)})"
                                              )
 
     if len(filter_exclude) > 0:
         param_id = []
         for index, word in enumerate(filter_exclude):
-            param_id.append(f'||:exc{index}') # Concatenate so arg bindings will work
+            param_id.append(f' :inc{index} ') # Concatenate so arg bindings will work
             parameters[f"exc{index}"] = f"\"{word}\"" # To escape characters like '$'
         include_exclude = include_exclude + (f" AND {table_name}_events_idx.id NOT IN "
                                              f"(SELECT id FROM {table_name}_events_idx WHERE {table_name}_events_idx"
-                                             f" MATCH \'{{{column_filter}}} : \'{" ".join(param_id)})"
+                                             f" MATCH \'{{{column_filter}}} : \'|| {"||\" OR \"||".join(param_id)})"
                                             )
     if validISODateRange(filter_min_date_range):
         include_exclude = include_exclude + (f" AND {table_name}_events_idx.date_time_min > :startmindate " +
