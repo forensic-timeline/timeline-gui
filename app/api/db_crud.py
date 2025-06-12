@@ -134,7 +134,7 @@ def get_page_event(
             parameters[f"inc{index}"] = f"\"{word}\"" # To escape characters like '$'
         include_exclude = include_exclude + (f" AND {table_name}_events_idx.id IN "
                                              f"(SELECT id FROM {table_name}_events_idx WHERE {table_name}_events_idx"
-                                             f" MATCH \'{{{column_filter}}} : \'|| {"||\" OR \"||".join(param_id)})"
+                                             f" MATCH \'{{{column_filter}}} : \'|| {"||\" AND \"||".join(param_id)})"
                                              )
 
     if len(filter_exclude) > 0:
@@ -144,7 +144,7 @@ def get_page_event(
             parameters[f"exc{index}"] = f"\"{word}\"" # To escape characters like '$'
         include_exclude = include_exclude + (f" AND {table_name}_events_idx.id NOT IN "
                                              f"(SELECT id FROM {table_name}_events_idx WHERE {table_name}_events_idx"
-                                             f" MATCH \'{{{column_filter}}} : \'|| {"||\" OR \"||".join(param_id)})"
+                                             f" MATCH \'{{{column_filter}}} : \'|| {"||\" AND \"||".join(param_id)})"
                                             )
     if validISODateRange(filter_min_date_range):
         include_exclude = include_exclude + (f" AND {table_name}_events_idx.date_time_min > :startmindate " +
