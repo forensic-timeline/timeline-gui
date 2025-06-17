@@ -1,14 +1,5 @@
 <!-- TODO: Add icons to buttons for accessibility -->
 <script setup>
-import { ref, watch } from 'vue'
-    const overlay = ref(false)
-    watch ( 
-      overlay, (val) => {
-        val && setTimeout(() => {
-          overlay.value = false
-        }, 3000)
-      }
-    )
 </script>
 
 <template>

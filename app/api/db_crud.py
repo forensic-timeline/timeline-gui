@@ -140,7 +140,7 @@ def get_page_event(
     if len(filter_exclude) > 0:
         param_id = []
         for index, word in enumerate(filter_exclude):
-            param_id.append(f' :inc{index} ') # Concatenate so arg bindings will work
+            param_id.append(f' :exc{index} ') # Concatenate so arg bindings will work
             parameters[f"exc{index}"] = f"\"{word}\"" # To escape characters like '$'
         include_exclude = include_exclude + (f" AND {table_name}_events_idx.id NOT IN "
                                              f"(SELECT id FROM {table_name}_events_idx WHERE {table_name}_events_idx"

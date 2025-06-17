@@ -312,7 +312,7 @@ async function on_submit() {
 
                 <v-card variant="outlined" class="pa-1">
                     <v-form @submit.prevent="on_submit" ref="searchForm">
-                        <h3> Search time, event type, description, category, reasoning description, and reference. </h3>
+                        <h3> Search time, event type, description, category, reasoning description, and test event data. </h3>
                         <h2> NOTE: Use whole words for searching </h2>
                         <v-text-field v-model="include_terms" label="Include terms (whole words separated by space)"
                             :disabled="is_loading == 1"></v-text-field>

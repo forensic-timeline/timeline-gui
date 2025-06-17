@@ -42,7 +42,7 @@ if (is_sign_up.value) {
         value => !!value || 'Field is required', // required
         value => {
             if (RegExp('^(.{0,7}|.{64,}|[^0-9]*|[^A-Z]*|[^a-z]*|[a-zA-Z0-9]*)$').test(value)) {
-                return 'Password must be:\n- Between 8 - 64 characters long\n- Have at least 1 capital letter, 1 number, and 1 special character'
+                return 'Password must be:\n- Between 8 - 64 characters long\n- Have at least 1 capital and lowercase letter, 1 number, and 1 special character'
             }
             else {
                 return true
@@ -64,7 +64,7 @@ else {
         value => !!value || 'Field is required', // required
         value => {
             if (RegExp('^(.{0,7}|.{64,}|[^0-9]*|[^A-Z]*|[^a-z]*|[a-zA-Z0-9]*)$').test(value)) {
-                return 'Password must be:\n- Between 8 - 64 characters long\n- Have at least 1 capital letter, 1 number, and 1 special character'
+                return 'Password must be:\n- Between 8 - 64 characters long\n- Have at least 1 capital and lowercase letter, 1 number, and 1 special character'
             }
             else {
                 return true
@@ -76,7 +76,7 @@ const confirmRules = [
     value => !!value || 'Field is required', // required
     value => {
         if (RegExp('^(.{0,7}|.{64,}|[^0-9]*|[^A-Z]*|[^a-z]*|[a-zA-Z0-9]*)$').test(value)) {
-            return 'Password must be:\n- Between 8 - 64 characters long\n- Have at least 1 capital letter, 1 number, and 1 special character'
+            return 'Password must be:\n- Between 8 - 64 characters long\n- Have at least 1 capital and lowercase letter, 1 number, and 1 special character'
         }
         else {
             return true

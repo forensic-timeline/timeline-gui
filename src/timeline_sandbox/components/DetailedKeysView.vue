@@ -33,7 +33,7 @@ function loadTable(){
 
 }
 
-async function retrieveData(id) {
+async function retrieveData() {
     loadTable() // Load table after dialog renders
 
     const requestOptions = {

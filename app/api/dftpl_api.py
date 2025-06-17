@@ -44,6 +44,6 @@ def call_run_dftpl():
         ) >= 0:
             
             return make_response("", 200)
-    return make_response("ERROR: Failed to generate or to save timeline file.", 400)
+    return make_response("ERROR: Failed to generate or to save timeline file. Please sign out to try again.", 400)
     # FIXME: Catch return if no high level timeline, show message
     # TODO: Delete csv if database is created successfuly
