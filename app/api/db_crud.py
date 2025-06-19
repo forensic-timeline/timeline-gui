@@ -2,13 +2,14 @@ from os.path import join
 from math import ceil
 from json import loads
 from re import match
+from datetime import datetime
 
 from flask import current_app, make_response, request, session
 
 # Auth
 from flask_login import login_required
 from sqlalchemy import create_engine, text  # Python objects for DB connections
-from sqlalchemy import select, func, and_, or_  # Methods for sql expressions
+from sqlalchemy import select, inspect  # Methods for sql expressions
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.exc import DBAPIError
 
@@ -39,6 +40,8 @@ TABLE_VALUES = {
             "plugin",
             "provenance_raw_entry",
         ],
+        "overview_label_column": "plugin",
+        "overview_text_column": "evidence"
     },
     "high_level": {
         "model": TLModel.HighLevelEvents,
@@ -53,39 +56,58 @@ TABLE_VALUES = {
             "reasoning_reference",
             "test_event_type",
             "test_event_evidence",
-            "low_level_event_id"
+            "low_level_event_id",
         ],
+        "overview_label_column": "type",
+        "overview_text_column": "description"
     },
 }
 
 MAX_KEYWORDS = 10
 MAX_KEYWORD_LEN = 100
 
+STRFTIME_FORMAT_STRING = {
+    "month": "%Y-%m",
+    "day": "%F",
+    "hour": "%FT%H",
+    "minute": "%FT%H-%M",
+}
+OVERVIEW_TEXT_LENGTH = 20 # Limit length for overview timeline text description
+
+
 # Definition of db URL string using session value
 def returnDBURL():
+    # TEST: TEST DB PATH
+    return (
+        "sqlite:///"
+        + r"D:\Moving\Documents\Universitas - MatKul\PraTA_TA_LaporanKP\TA"
+        + r"\Proj\dftpl_gui_proj\test\11062025.sqlite"
+    )
 
     return "sqlite:///" + join(
-        current_app.config["UPLOAD_DIR"]
-        + "\\"
-        + f"{session['session_db']}"
+        current_app.config["UPLOAD_DIR"] + "\\" + f"{session['session_db']}"
     )
+
 
 # Helper function to validate ISO 8601 string date range arrays
 def validISODateRange(date_range):
     # Is it a valid string arr
-    if (len(date_range) == 2):
-        if isinstance(date_range[0],str) and isinstance(date_range[1],str):
-    # Are the dates valid ISO 8601 string
-            re_str = (r"^(-?(?:[0-9][0-9]*)?[0-9]{4})-(1[0-2]|0[0-9])-(3[01]|0[0-9]|[12]" +
-                      r"[0-9])T(2[0-3]|[01][0-9]):([0-5][0-9]):([0-5][0-9])(\.[0-9]{6})?(Z|" +
-                      r"[+-](?:2[0-3]|[01][0-9]):[0-5][0-9])?$")
+    if len(date_range) == 2:
+        if isinstance(date_range[0], str) and isinstance(date_range[1], str):
+            # Are the dates valid ISO 8601 string
+            re_str = (
+                r"^(-?(?:[0-9][0-9]*)?[0-9]{4})-(1[0-2]|0[0-9])-(3[01]|0[0-9]|[12]"
+                + r"[0-9])T(2[0-3]|[01][0-9]):([0-5][0-9]):([0-5][0-9])(\.[0-9]{6})?(Z|"
+                + r"[+-](?:2[0-3]|[01][0-9]):[0-5][0-9])?$"
+            )
             if match(re_str, date_range[0]) and match(re_str, date_range[1]):
-    # Is the start date less than the end date?
+                # Is the start date less than the end date?
                 if date_range[0] < date_range[1]:
                     return True
     # If pass all, return true
     # Else return false
     return False
+
 
 # Pagination function (use in API)
 # 1. Low level tables
@@ -94,9 +116,9 @@ def validISODateRange(date_range):
 
 
 # Label logic:
-    # Join event row with labels to retrieve attached label (many to many)
-    # Add "GROUP BY" clause for order of "GROUP_CONCAT" function
-    # It's so only the filtered & concatenated events are included in the JOIN operation
+# Join event row with labels to retrieve attached label (many to many)
+# Add "GROUP BY" clause for order of "GROUP_CONCAT" function
+# It's so only the filtered & concatenated events are included in the JOIN operation
 # TEST: Measure execution time for each page retrieval
 # FIXME: Error handling for all execution
 # Support for search, filter, sort, range?
@@ -109,20 +131,20 @@ def get_page_event(
     sort_column: str = "id",
     get_page: int = 1,
     filter_label: list[int] = [],
-    filter_min_date_range: list[str] = []
+    filter_min_date_range: list[str] = [],
 ):
     is_filter_label = isinstance(filter_label, list) and len(filter_label) > 0
     # TEST: https://mysql.rjweb.org/doc.php/pagination
     cur_page = 1 if get_page < 1 else get_page  # Check min page requested
     max_page = 1
-    page_rows = {} # Converted into list of dicts before returning
+    page_rows = {}  # Converted into list of dicts before returning
     # FIXME: Check if code can handle modified db (missing ids, not ordered ids, missing values)
     # Define MATCH statement (if any is required)
     # NOTE: Pylint throws a "not callable" error but false positive
     # https://github.com/sqlalchemy/sqlalchemy/discussions/9202
     include_exclude = ""
     column_filter = " ".join(TABLE_VALUES[table_name]["columns"])
-    parameters = {} # For binding parameters
+    parameters = {}  # For binding parameters
     # Generates MATCH statement with parameter tokens
     # HACK: Hardcoded table name
     # FIXME: Escape characters such as '%' in sqlite
@@ -130,26 +152,29 @@ def get_page_event(
     if len(filter_include) > 0:
         param_id = []
         for index, word in enumerate(filter_include):
-            param_id.append(f' :inc{index} ') # Concatenate so arg bindings will work
-            parameters[f"inc{index}"] = f"\"{word}\"" # To escape characters like '$'
-        include_exclude = include_exclude + (f" AND {table_name}_events_idx.id IN "
-                                             f"(SELECT id FROM {table_name}_events_idx WHERE {table_name}_events_idx"
-                                             f" MATCH \'{{{column_filter}}} : \'|| {"||\" AND \"||".join(param_id)})"
-                                             )
+            param_id.append(f" :inc{index} ")  # Concatenate so arg bindings will work
+            parameters[f"inc{index}"] = f'"{word}"'  # To escape characters like '$'
+        include_exclude = include_exclude + (
+            f" AND {table_name}_events_idx.id IN "
+            f"(SELECT id FROM {table_name}_events_idx WHERE {table_name}_events_idx"
+            f" MATCH '{{{column_filter}}} : '|| {'||" AND "||'.join(param_id)})"
+        )
 
     if len(filter_exclude) > 0:
         param_id = []
         for index, word in enumerate(filter_exclude):
-            param_id.append(f' :exc{index} ') # Concatenate so arg bindings will work
-            parameters[f"exc{index}"] = f"\"{word}\"" # To escape characters like '$'
-        include_exclude = include_exclude + (f" AND {table_name}_events_idx.id NOT IN "
-                                             f"(SELECT id FROM {table_name}_events_idx WHERE {table_name}_events_idx"
-                                             f" MATCH \'{{{column_filter}}} : \'|| {"||\" AND \"||".join(param_id)})"
-                                            )
+            param_id.append(f" :exc{index} ")  # Concatenate so arg bindings will work
+            parameters[f"exc{index}"] = f'"{word}"'  # To escape characters like '$'
+        include_exclude = include_exclude + (
+            f" AND {table_name}_events_idx.id NOT IN "
+            f"(SELECT id FROM {table_name}_events_idx WHERE {table_name}_events_idx"
+            f" MATCH '{{{column_filter}}} : '|| {'||" AND "||'.join(param_id)})"
+        )
     if validISODateRange(filter_min_date_range):
-        include_exclude = include_exclude + (f" AND {table_name}_events_idx.date_time_min > :startmindate " +
-                                             f"AND {table_name}_events_idx.date_time_min < :endmindate" 
-                                    )
+        include_exclude = include_exclude + (
+            f" AND {table_name}_events_idx.date_time_min > :startmindate "
+            + f"AND {table_name}_events_idx.date_time_min < :endmindate"
+        )
         parameters["startmindate"] = filter_min_date_range[0]
         parameters["endmindate"] = filter_min_date_range[1]
 
@@ -157,30 +182,35 @@ def get_page_event(
     # Get max pages
     # HACK: So MATCH and id where statements can be appended conditionally
     if is_filter_label:
-        stmt = f"SELECT * FROM {table_name}_events_idx WHERE 1=1" 
+        stmt = f"SELECT * FROM {table_name}_events_idx WHERE 1=1"
         if include_exclude != "":
             stmt = f"{stmt} {include_exclude}"
-    
+
         # If filter by label, add inner join to only include events with label
         # and to calculate page properly
-        stmt = (f"SELECT COUNT(a.id) FROM ({stmt}) AS a " +
-            f"INNER JOIN labels_{table_name}_events AS b ON b.{table_name}_events_id = a.id " +
-            "INNER JOIN labels AS c ON b.labels_id = c.id "
-            f"WHERE c.id IN ({", ".join(str(id) for id in filter_label)})")
+        stmt = (
+            f"SELECT COUNT(a.id) FROM ({stmt}) AS a "
+            + f"INNER JOIN labels_{table_name}_events AS b ON b.{table_name}_events_id = a.id "
+            + "INNER JOIN labels AS c ON b.labels_id = c.id "
+            f"WHERE c.id IN ({', '.join(str(id) for id in filter_label)})"
+        )
     else:
-        stmt = f"SELECT COUNT(id) FROM {table_name}_events_idx WHERE 1=1 {include_exclude}"   
-
-
+        stmt = (
+            f"SELECT COUNT(id) FROM {table_name}_events_idx WHERE 1=1 {include_exclude}"
+        )
 
     try:
         max_page = ceil(
-            float(db_session.scalars(text(stmt), parameters).first()) / float(AMOUNT_IN_PAGE)
+            float(db_session.scalars(text(stmt), parameters).first())
+            / float(AMOUNT_IN_PAGE)
         )  # Automatically closes result after getting value
     except DBAPIError as e:
-        print(repr(e)) # FIXME
+        print(repr(e))  # FIXME
         return -1
-    
-    cur_page = max_page if get_page >= max_page else get_page  # Check max page requested
+
+    cur_page = (
+        max_page if get_page >= max_page else get_page
+    )  # Check max page requested
 
     # Create select and where statement before adding limit and id lookup
     # HACK: Using raw SQL so MATCH and id where statements on FTS5 table can be appended conditionally
@@ -192,10 +222,12 @@ def get_page_event(
     # If filter by label, add inner join to only include events with label
     # and to calculate page properly
     if is_filter_label:
-        sub_stmt_2 = (f"SELECT a.*, c.id as cid, c.name as cname FROM ({sub_stmt_2}) AS a " +
-            f"INNER JOIN labels_{table_name}_events AS b ON b.{table_name}_events_id = a.id " +
-            "INNER JOIN labels AS c ON b.labels_id = c.id "
-            f"WHERE c.id IN ({", ".join(str(id) for id in filter_label)})")
+        sub_stmt_2 = (
+            f"SELECT a.*, c.id as cid, c.name as cname FROM ({sub_stmt_2}) AS a "
+            + f"INNER JOIN labels_{table_name}_events AS b ON b.{table_name}_events_id = a.id "
+            + "INNER JOIN labels AS c ON b.labels_id = c.id "
+            f"WHERE c.id IN ({', '.join(str(id) for id in filter_label)})"
+        )
 
     # NOTE: If ORDER BY is in nested SELECT, it won't trigger without LIMIT
     # THEORY: Due to SQLite's query optimizer
@@ -204,36 +236,38 @@ def get_page_event(
     if cur_page <= 1:
         sub_stmt_2 = f"{sub_stmt_2} ORDER BY {sort_column} {IS_ASCENDING_VALUES[sort_asc]} LIMIT {AMOUNT_IN_PAGE}"
 
-
     # else if last, sort by last then limit
     elif cur_page >= max_page:
         sub_stmt_2 = f"{sub_stmt_2} ORDER BY {sort_column} {IS_ASCENDING_VALUES[not sort_asc]} LIMIT {AMOUNT_IN_PAGE}"
     # else calculate id to start retrieving with limit
     else:
         sub_stmt_2 = f"{sub_stmt_2} AND id {IS_ASCENDING_SIGN[sort_asc]} :pagenum ORDER BY {sort_column} {IS_ASCENDING_VALUES[sort_asc]} LIMIT {AMOUNT_IN_PAGE}"
-        parameters["pagenum"] = (cur_page - 1) * AMOUNT_IN_PAGE if sort_asc else (max_page - cur_page + 1) * AMOUNT_IN_PAGE
+        parameters["pagenum"] = (
+            (cur_page - 1) * AMOUNT_IN_PAGE
+            if sort_asc
+            else (max_page - cur_page + 1) * AMOUNT_IN_PAGE
+        )
 
     # If not filtered by label, join labels using left join to include events without labels
-    if(is_filter_label):
+    if is_filter_label:
         stmt_2 = sub_stmt_2
 
     else:
         stmt_2 = (
-            f"SELECT a.*, c.id as cid, c.name as cname FROM ({sub_stmt_2}) AS a " +
-            f"LEFT JOIN labels_{table_name}_events AS b ON b.{table_name}_events_id = a.id " +
-            "LEFT JOIN labels AS c ON b.labels_id = c.id "
+            f"SELECT a.*, c.id as cid, c.name as cname FROM ({sub_stmt_2}) AS a "
+            + f"LEFT JOIN labels_{table_name}_events AS b ON b.{table_name}_events_id = a.id "
+            + "LEFT JOIN labels AS c ON b.labels_id = c.id "
         )
-
 
     if table_name == "high_level":
         stmt_2 = (
-            f"SELECT * FROM ({stmt_2}) " +
-            "LEFT JOIN (" +
-            "SELECT key_name, key_value, high_level_events_id FROM keys" +
-            ") AS k ON k.high_level_events_id = id"
+            f"SELECT * FROM ({stmt_2}) "
+            + "LEFT JOIN ("
+            + "SELECT key_name, key_value, high_level_events_id FROM keys"
+            + ") AS k ON k.high_level_events_id = id"
         )
 
-    # Stores in temp dict of {id: rowdata} 
+    # Stores in temp dict of {id: rowdata}
     try:
         for row in db_session.execute(text(stmt_2), parameters).all():
             row_dict = row._asdict()
@@ -241,12 +275,23 @@ def get_page_event(
             # Since accessing value by key is O(1)
             # NOTE: JS Dict key values must be obj or string, so id is converted into string before returned
 
-            if(row_dict["id"] in page_rows):
-                if row_dict["cid"] and row_dict["cid"] not in page_rows[row_dict["id"]]["cid"]:
+            if row_dict["id"] in page_rows:
+                if (
+                    row_dict["cid"]
+                    and row_dict["cid"] not in page_rows[row_dict["id"]]["cid"]
+                ):
                     page_rows[row_dict["id"]]["cid"].append(str(row_dict["cid"]))
-                if row_dict["cname"] and row_dict["cname"] not in page_rows[row_dict["id"]]["cname"]:
+                if (
+                    row_dict["cname"]
+                    and row_dict["cname"] not in page_rows[row_dict["id"]]["cname"]
+                ):
                     page_rows[row_dict["id"]]["cname"].append(row_dict["cname"])
-                if table_name == "high_level" and row_dict["key_name"] and row_dict["key_name"] not in page_rows[row_dict["id"]]["key_name"]:
+                if (
+                    table_name == "high_level"
+                    and row_dict["key_name"]
+                    and row_dict["key_name"]
+                    not in page_rows[row_dict["id"]]["key_name"]
+                ):
                     page_rows[row_dict["id"]]["key_name"].append(row_dict["key_name"])
 
             else:
@@ -263,13 +308,14 @@ def get_page_event(
         # Which could be O(n^2)
         page_rows = list(page_rows.values())
     except DBAPIError as e:
-        print(repr(e)) # FIXME
+        print(repr(e))  # FIXME
         return -1
-    except Exception as e: # HACK
-        print(repr(e)) # FIXME
-        return -2 # Incase unexpected error
+    except Exception as e:  # HACK
+        print(repr(e))  # FIXME
+        return -2  # Incase unexpected error
     # Return results
     return {"max_page": max_page, "page_rows": page_rows}
+
 
 # Validates arguments and retrieves timeline data
 @api.route("/timeline/<string:event_type>", methods=["GET"])
@@ -279,7 +325,7 @@ def load_timeline(event_type):
         # TODO: Replace with user's database session info
         # TEST: Use test db to avoid processing with dftpl each test
         database_uri = returnDBURL()
-        db_engine = create_engine(database_uri, echo=True) # TEST
+        db_engine = create_engine(database_uri, echo=True)  # TEST
         db_session = scoped_session(
             sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
         )
@@ -293,22 +339,30 @@ def load_timeline(event_type):
         arg_asc = request.args.get("asc", default="true", type=str)
         arg_bycol = request.args.get("byCol", default="id", type=str)
         arg_cur_page = request.args.get("curPage", default=1, type=int)
-        arg_filter_label = "".join(request.args.get("filterLabel", default="", type=str).split()) # Remove whitespace for invalid
-        arg_min_date_range_list = loads(request.args.get("minDateRangeArr", default="", type=str)) # Remove whitespace for invalid
+        arg_filter_label = "".join(
+            request.args.get("filterLabel", default="", type=str).split()
+        )  # Remove whitespace for invalid
+        arg_min_date_range_list = loads(
+            request.args.get("minDateRangeArr", default="", type=str)
+        )  # Remove whitespace for invalid
 
         # Translates bool string to value
         if arg_asc == "true":
-            arg_asc = True 
+            arg_asc = True
         elif arg_asc == "false":
             arg_asc = False
 
         # Checks if term string is too long
         for term in arg_include:
             if len(term) >= MAX_KEYWORD_LEN:
-                return make_response(f"ERROR: Keyword too long, MAX: {MAX_KEYWORD_LEN} characters", 400)
+                return make_response(
+                    f"ERROR: Keyword too long, MAX: {MAX_KEYWORD_LEN} characters", 400
+                )
         for term in arg_exclude:
             if len(term) >= MAX_KEYWORD_LEN:
-                return make_response(f"ERROR: Keyword too long, MAX: {MAX_KEYWORD_LEN} characters", 400)
+                return make_response(
+                    f"ERROR: Keyword too long, MAX: {MAX_KEYWORD_LEN} characters", 400
+                )
         # Limit number of include and exclude to MAX_KEYWORDS strings
         if len(arg_include) >= MAX_KEYWORDS or len(arg_exclude) >= MAX_KEYWORDS:
             db_session.remove()
@@ -326,7 +380,6 @@ def load_timeline(event_type):
         # Include and exclude strings doesn't need to be sanitized
         # since not using raw sql commands so handled by SQLAlchemy
 
-
         # Update valid values if needed
 
         page_data = get_page_event(
@@ -337,8 +390,8 @@ def load_timeline(event_type):
             sort_asc=arg_asc,
             sort_column=arg_bycol,
             get_page=arg_cur_page,
-            filter_label=loads(arg_filter_label or 'null'),
-            filter_min_date_range=arg_min_date_range_list
+            filter_label=loads(arg_filter_label or "null"),
+            filter_min_date_range=arg_min_date_range_list,
         )
         if isinstance(page_data, int) and page_data < 0:
             db_session.remove()
@@ -352,6 +405,7 @@ def load_timeline(event_type):
     else:
         return make_response("", 404)
 
+
 # Keys API
 # INPROGRESS
 # Currently only used to retrieve keys from keys table for high level events
@@ -364,7 +418,7 @@ def get_high_level_keys():
 
     keys_data = {}
     database_uri = returnDBURL()
-    db_engine = create_engine(database_uri, echo=True) # TEST
+    db_engine = create_engine(database_uri, echo=True)  # TEST
     db_session = scoped_session(
         sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
     )
@@ -377,20 +431,25 @@ def get_high_level_keys():
         db_session.remove()
         db_engine.dispose()
     except DBAPIError as e:
-        print(repr(e)) # FIXME
+        print(repr(e))  # FIXME
         return make_response("ERROR: Invalid Request", 400)
-    except Exception as e: # HACK
-        print(repr(e)) # FIXME
+    except Exception as e:  # HACK
+        print(repr(e))  # FIXME
         return make_response("ERROR: Invalid Request", 400)
 
     return make_response(keys_data, 200)
+
 
 # Comment APIs
 # Edit
 @api.route("/timeline/<string:event_type>/u_comments", methods=["POST"])
 @login_required
 def update_comments(event_type):
-    if event_type in ["low_level", "high_level"] and "rowID" in request.form and "comment" in request.form:
+    if (
+        event_type in ["low_level", "high_level"]
+        and "rowID" in request.form
+        and "comment" in request.form
+    ):
         if len(request.form["comment"]) > 200:
             return make_response("", 400)
         # TODO: Replace with user's database session info
@@ -398,21 +457,33 @@ def update_comments(event_type):
         database_uri = returnDBURL()
         db_engine = create_engine(database_uri, echo=True)
         db_session = scoped_session(
-            sessionmaker(autocommit=False, autoflush=False, bind=db_engine, )
+            sessionmaker(
+                autocommit=False,
+                autoflush=False,
+                bind=db_engine,
+            )
         )
 
         # Try to update, catch errors (like out of bounds error)
         # HACK: Hardcoded table name
         try:
-            stmt = (f"UPDATE {event_type}_events " +
-                    f"SET user_comments = :c " +
-                    f"WHERE {event_type}_events.id = :s") # Updates main table
-            stmt2 = (f"UPDATE {event_type}_events_idx " +
-                    f"SET user_comments = :c " +
-                    f"WHERE {event_type}_events_idx.id = :s")# Updates fts5 table
-            
-            db_session.execute(text(stmt), {"c": request.form["comment"], "s": request.form["rowID"]})
-            db_session.execute(text(stmt2), {"c": request.form["comment"], "s": request.form["rowID"]})
+            stmt = (
+                f"UPDATE {event_type}_events "
+                + f"SET user_comments = :c "
+                + f"WHERE {event_type}_events.id = :s"
+            )  # Updates main table
+            stmt2 = (
+                f"UPDATE {event_type}_events_idx "
+                + f"SET user_comments = :c "
+                + f"WHERE {event_type}_events_idx.id = :s"
+            )  # Updates fts5 table
+
+            db_session.execute(
+                text(stmt), {"c": request.form["comment"], "s": request.form["rowID"]}
+            )
+            db_session.execute(
+                text(stmt2), {"c": request.form["comment"], "s": request.form["rowID"]}
+            )
             db_session.commit()
         except DBAPIError as e:
             db_session.remove()
@@ -425,4 +496,209 @@ def update_comments(event_type):
         return make_response("", 200)
     else:
         return make_response("", 404)
-    
+
+
+# Helper function to create ISO8601 strings for db searching.
+# Pads empty arguments with 0 values.
+# WARNING: Can result in invalid ISO 8601 dates
+# FIXME: Allow for timezones other than UTC
+def constructISO8601(
+    year: "0000", month: "00", day: "00", hour: "00", minute: "00", second: "00"
+):
+    # Are the dates valid ISO 8601 string
+    date_string = f"{year}-{month}-{day}T{hour}:{minute}:{second}.000000+00:00"
+    re_str = (
+        r"^(-?(?:[0-9][0-9]*)?[0-9]{4})-(1[0-2]|0[0-9])-(3[01]|0[0-9]|[12]"
+        + r"[0-9])T(2[0-3]|[01][0-9]):([0-5][0-9]):([0-5][0-9])(\.[0-9]{6})?(Z|"
+        + r"[+-](?:2[0-3]|[01][0-9]):[0-5][0-9])?$"
+    )
+    if match(re_str, date_string):
+        return date_string
+    else:
+        return False
+
+
+# TEST API
+
+#  Retrieves all timeline data.
+#  @param openNodes Dicts of dicts {analyser: {entry_id: [[start_id, amount]]}} to expand. Empty array if none is selected.
+#  @param aggregateBy Time interval for period ("month","day", "hour", or "minute"), unused if reqType = "event"
+# @param loadInvalid Flag, enable to load events before epoch time and current time which doesn't have valid timestamps
+
+
+# FIXME: Allow for timezones other than UTC
+# TODO: Default range is epoch time to current time. Anything else is assumed to be invalid timestamps
+# only loaded when loadInvalid flag is true
+@api.route("/timeline/<string:event_type>/overview", methods=["POST"])
+def timeline_overview(event_type):
+    EPOCH_ISO = "1970-01-01T00:00:00.000000+00:00"
+    TODAY_ISO = datetime.today().strftime("%Y-%m-%dT%H:%M:%S.%f%:z")
+    if (
+        event_type in ["low_level", "high_level"]
+        and "openNodes" in request.form
+        and "aggregateBy" in request.form
+        and "loadInvalid" in request.form
+    ):
+        # Translates bool string to value
+        is_load_invalid = False
+        if request.form["loadInvalid"] == "true":
+            is_load_invalid = True
+
+        # TODO: Validate values
+        if request.form["aggregateBy"] in list(STRFTIME_FORMAT_STRING.keys()):
+            database_uri = returnDBURL()
+            db_engine = create_engine(database_uri) # TEST ECHO
+            db_session = scoped_session(
+                sessionmaker(
+                    autocommit=False,
+                    autoflush=False,
+                    bind=db_engine,
+                )
+            )
+            result_json = []
+            is_load_invalid_str = f"AND date_time_min >= '{EPOCH_ISO}' AND date_time_min <= '{TODAY_ISO}' " if not is_load_invalid else ""
+            # Get dict of periods, first
+            stmt = text(
+                f"SELECT id, {TABLE_VALUES[event_type]['overview_label_column']}, date_time_min, COUNT(id) as event_num "
+                + f"FROM {event_type}_events WHERE 1=1 "
+                + is_load_invalid_str
+                + f"GROUP BY {TABLE_VALUES[event_type]['overview_label_column']}, strftime('{STRFTIME_FORMAT_STRING[request.form["aggregateBy"]]}', date_time_min)"
+            )
+            inserted_category = []
+            COLOR_DEF = {False: "#001EFF", True: "#87004F"} # Coloring period nodes
+            try:
+                # Get all the period nodes
+                for index, row in enumerate(db_session.execute(stmt).all()):
+                    # Changes color if period node is expanded
+                    toggleColor = False
+                    if row[1] in list(loads(request.form['openNodes']).keys()):
+                        if str(index) in loads(loads(request.form['openNodes'])[row[1]]).keys():
+                            toggleColor = True
+                    if row[1] in inserted_category:
+                        # Index for category in inserted_category should be the same
+                        result_json[inserted_category.index(row[1])]["nodes"].append(
+                            {
+                                "entry_id": index,
+                                "category": row[1],
+                                "type": "period",
+                                "timestamp": row[2],
+                                "start_id": row[0],
+                                "text": f"Event count: {row[3]}",
+                                "textStyle": {
+                                    "color": f"{COLOR_DEF[toggleColor]}"
+                                },
+                            }
+                        )
+                    else:
+                        result_json.append(
+                            {
+                                "category": row[1],
+                                "nodes": [
+                                    {
+                                        "entry_id": index,
+                                        "category": row[1],
+                                        "type": "period",
+                                        "timestamp": row[2],
+                                        "start_id": row[0],
+                                        "text": f"Event count: {row[3]}",
+                                        "textStyle": {
+                                            "color": f"{COLOR_DEF[toggleColor]}"
+                                        },
+                                    }
+                                ],
+                            }
+                        )
+                        inserted_category.append(row[1])
+            # If some period nodes is expanded, retrieve said events
+                if len(loads(request.form["openNodes"])) > 0:
+                    stmt2_arr = []
+                    
+                    for category, id_dicts in loads(request.form['openNodes']).items():
+                        for [start_id, amount] in loads(id_dicts).values():
+                            stmt2_arr.append(
+                                [category,
+                                text(
+                                    f"SELECT id, {TABLE_VALUES[event_type]['overview_text_column']}, date_time_min "+
+                                    f"FROM {event_type}_events WHERE 1=1 "+
+                                    f"AND id >= {start_id} AND {TABLE_VALUES[event_type]['overview_label_column']} == '{category}'  "+
+                                    is_load_invalid_str+
+                                    f"LIMIT {amount[13:]}" # Skip past "Event count: " string
+                                )
+                                ]
+                            )
+                    # Get all the event nodes
+                    for [category, statement] in stmt2_arr:
+                        for index, row in enumerate(db_session.execute(statement).all()):
+                                result_json[inserted_category.index(category)]["nodes"].append(
+                                {
+                                    "category": category,
+                                    "type": "event",
+                                    "timestamp": row[2],
+                                    "event_id": row[0],
+                                    "text": f"ID {0}: {row[1][:OVERVIEW_TEXT_LENGTH]}",
+                                    "textStyle": {
+                                        "color": "#698600"
+                                    },
+                                }
+                            )
+            except DBAPIError as e:
+                print(repr(e))  # FIXME
+                db_session.remove()
+                db_engine.dispose()
+                return make_response("ERROR: Database engine error", 500)
+
+            db_session.remove()
+            db_engine.dispose()
+            if len(result_json) < 1:
+                return make_response(
+                    "ERROR: Is there no events? If there is, please report this db error!",
+                    500,
+                )
+            
+            return result_json
+        else:
+            return make_response("ERROR: Invalid Request", 400)
+    else:
+        return make_response("ERROR: Invalid Request", 400)
+
+# TEST
+def object_as_dict(obj):
+    return {c.key: getattr(obj, c.key)
+            for c in inspect(obj).mapper.column_attrs}
+
+# Get a single event's data, for overview
+@api.route("/timeline/<string:event_type>/overview_detail", methods=["GET"])
+def overview_detail_event(event_type):
+    if (
+        event_type in ["low_level", "high_level"]
+    ):
+        # Get row id from GET Args
+        row_id = request.args.get("rowID", default=0, type=int)
+
+        event_data = {}
+        database_uri = returnDBURL()
+        db_engine = create_engine(database_uri, echo=True)  # TEST
+        db_session = scoped_session(
+            sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
+        )
+        stmt = select(TABLE_VALUES[event_type]["model"]).where(TABLE_VALUES[event_type]["model"].id == row_id)
+        if event_type == "high_level":
+            stmt2 = select(TLModel.Labels).where(TLModel.labels_high_level_events_table.c.high_level_events_id == row_id)
+        else:
+            stmt2 = select(TLModel.Labels.name).join(TLModel.labels_low_level_events_table).where(TLModel.labels_low_level_events_table.c.low_level_events_id == row_id)
+        try:
+            # TEST
+            
+            # print(isinstance(db_session.scalars(stmt).first(), TABLE_VALUES[event_type]["model"]))
+            event_data = object_as_dict(db_session.scalars(stmt).first())
+            event_data["labels"] = "|".join(db_session.scalars(stmt2).all())
+            db_session.remove()
+            db_engine.dispose()
+        except DBAPIError as e:
+            print(repr(e))  # FIXME
+            return make_response("ERROR: Invalid Request", 400)
+        except Exception as e:  # HACK
+            print(repr(e))  # FIXME
+            return make_response("ERROR: Invalid Request", 400)
+        return make_response(event_data, 200)
+    return make_response("ERROR: Invalid Request", 400)

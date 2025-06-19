@@ -12,8 +12,10 @@ import { mdi } from 'vuetify/iconsets/mdi'
 import { aliases, fa } from 'vuetify/iconsets/fa'
 import "@mdi/font/css/materialdesignicons.css"; // Ensure you are using css-loader
 import "@fortawesome/fontawesome-free/css/all.css"; // Ensure your project is capable of handling css files
+import "d3-milestones/build/d3-milestones.css" //Test d3-milestones css
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
+import OverviewLowLevel from './views/OverviewLowLevel.vue'
 
 
 const router = createRouter(
@@ -45,7 +47,14 @@ const router = createRouter(
         path: '/high-level',
         name: 'high_level',
         component: DetailedHighLevel
-      } 
+      }
+      ,
+      {
+        // TEST
+        path: '/overview-low',
+        name: 'overview_low',
+        component: OverviewLowLevel
+      }
     ]
   }
 )

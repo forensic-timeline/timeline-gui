@@ -32,8 +32,6 @@ from app.api import api
 @login_required
 # TEST: Add auth later
 def get_labels():
-    # TODO: Replace with user's database session info
-    # TEST: Use test db to avoid processing with dftpl each test
     database_uri = returnDBURL()
     db_engine = create_engine(database_uri, echo=True)
     db_session = scoped_session(

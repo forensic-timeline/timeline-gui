@@ -149,7 +149,6 @@ const selected_row = ref(false)
 
 // retrieveData: Retrieve paginated data asynchronously
 // Uses GET, example like sciencedirect.com
-// TODO: Filter by date and time range
 async function retrieveData(curPage) {
     search_form.value?.validate().then(async ({ valid: isValid }) => {
         if (isValid) {
