@@ -524,7 +524,7 @@ def constructISO8601(
 #  @param openNodes Dicts of dicts {analyser: {entry_id: [[start_id, amount]]}} to expand. Empty array if none is selected.
 #  @param aggregateBy Time interval for period ("month","day", "hour", or "minute"), unused if reqType = "event"
 # @param loadInvalid Flag, enable to load events before epoch time and current time which doesn't have valid timestamps
-
+# @param doMergeTimelines Flag, enable to merge all categories into one timeline
 
 # FIXME: Allow for timezones other than UTC
 # TODO: Default range is epoch time to current time. Anything else is assumed to be invalid timestamps
@@ -538,11 +538,15 @@ def timeline_overview(event_type):
         and "openNodes" in request.form
         and "aggregateBy" in request.form
         and "loadInvalid" in request.form
+        and "doMergeTimelines" in request.form
     ):
         # Translates bool string to value
         is_load_invalid = False
         if request.form["loadInvalid"] == "true":
             is_load_invalid = True
+        is_merge_timelines = False
+        if request.form["doMergeTimelines"] == "true":
+            is_merge_timelines = True
 
         # TODO: Validate values
         if request.form["aggregateBy"] in list(STRFTIME_FORMAT_STRING.keys()):
@@ -567,48 +571,82 @@ def timeline_overview(event_type):
             inserted_category = []
             COLOR_DEF = {False: "#001EFF", True: "#87004F"} # Coloring period nodes
             try:
+                # If merged into one timeline, prepare structure
+                if is_merge_timelines:
+                    result_json.append({
+                        "category": "Merged timeline",
+                        "nodes": []
+                    })
                 # Get all the period nodes
+                # For all result row
                 for index, row in enumerate(db_session.execute(stmt).all()):
                     # Changes color if period node is expanded
                     toggleColor = False
+                    # If this category is included in the expanded nodes list
                     if row[1] in list(loads(request.form['openNodes']).keys()):
+                        # If this period node is expanded
                         if str(index) in loads(loads(request.form['openNodes'])[row[1]]).keys():
                             toggleColor = True
-                    if row[1] in inserted_category:
-                        # Index for category in inserted_category should be the same
-                        result_json[inserted_category.index(row[1])]["nodes"].append(
+                    
+                    # If timelines is merged
+                    if is_merge_timelines:
+                        # So add new period node to category's dictionary
+                        result_json[0]["nodes"].append(
                             {
                                 "entry_id": index,
                                 "category": row[1],
+                                "evt_count": row[3],
                                 "type": "period",
                                 "timestamp": row[2],
                                 "start_id": row[0],
-                                "text": f"Event count: {row[3]}",
+                                "text": f"{row[1]}-Event count: {row[3]}",
                                 "textStyle": {
                                     "color": f"{COLOR_DEF[toggleColor]}"
                                 },
                             }
                         )
-                    else:
-                        result_json.append(
-                            {
-                                "category": row[1],
-                                "nodes": [
-                                    {
-                                        "entry_id": index,
-                                        "category": row[1],
-                                        "type": "period",
-                                        "timestamp": row[2],
-                                        "start_id": row[0],
-                                        "text": f"Event count: {row[3]}",
-                                        "textStyle": {
-                                            "color": f"{COLOR_DEF[toggleColor]}"
-                                        },
-                                    }
-                                ],
-                            }
-                        )
-                        inserted_category.append(row[1])
+                    # If timelines are separated
+                    else: 
+                        # If this category already inserted into structure
+                        if row[1] in inserted_category:
+                            # Index for category in inserted_category should be the same
+                            # So add new period node to category's dictionary
+                            result_json[inserted_category.index(row[1])]["nodes"].append(
+                                {
+                                    "entry_id": index,
+                                    "category": row[1],
+                                    "evt_count": row[3],
+                                    "type": "period",
+                                    "timestamp": row[2],
+                                    "start_id": row[0],
+                                    "text": f"Event count: {row[3]}",
+                                    "textStyle": {
+                                        "color": f"{COLOR_DEF[toggleColor]}"
+                                    },
+                                }
+                            )
+                        else:
+                            # Create new category dict
+                            result_json.append(
+                                {
+                                    "category": row[1],
+                                    "nodes": [
+                                        {
+                                            "entry_id": index,
+                                            "category": row[1],
+                                            "type": "period",
+                                            "timestamp": row[2],
+                                            "start_id": row[0],
+                                            "text": f"Event count: {row[3]}",
+                                            "textStyle": {
+                                                "color": f"{COLOR_DEF[toggleColor]}"
+                                            },
+                                        }
+                                    ],
+                                }
+                            )
+                            inserted_category.append(row[1])
+
             # If some period nodes is expanded, retrieve said events
                 if len(loads(request.form["openNodes"])) > 0:
                     stmt2_arr = []
@@ -622,25 +660,39 @@ def timeline_overview(event_type):
                                     f"FROM {event_type}_events WHERE 1=1 "+
                                     f"AND id >= {start_id} AND {TABLE_VALUES[event_type]['overview_label_column']} == '{category}'  "+
                                     is_load_invalid_str+
-                                    f"LIMIT {amount[13:]}" # Skip past "Event count: " string
+                                    f"LIMIT {amount}" # Skip past "Event count: " string
                                 )
                                 ]
                             )
                     # Get all the event nodes
                     for [category, statement] in stmt2_arr:
                         for index, row in enumerate(db_session.execute(statement).all()):
-                                result_json[inserted_category.index(category)]["nodes"].append(
-                                {
-                                    "category": category,
-                                    "type": "event",
-                                    "timestamp": row[2],
-                                    "event_id": row[0],
-                                    "text": f"ID {0}: {row[1][:OVERVIEW_TEXT_LENGTH]}",
-                                    "textStyle": {
-                                        "color": "#698600"
-                                    },
-                                }
-                            )
+                                if is_merge_timelines:
+                                    result_json[0]["nodes"].append(
+                                        {
+                                            "category": category,
+                                            "type": "event",
+                                            "timestamp": row[2],
+                                            "event_id": row[0],
+                                            "text": f"{category} ID {0}: {row[1][:OVERVIEW_TEXT_LENGTH]}",
+                                            "textStyle": {
+                                                "color": "#698600"
+                                            },
+                                        }
+                                    )
+                                else:
+                                    result_json[inserted_category.index(category)]["nodes"].append(
+                                        {
+                                            "category": category,
+                                            "type": "event",
+                                            "timestamp": row[2],
+                                            "event_id": row[0],
+                                            "text": f"ID {0}: {row[1][:OVERVIEW_TEXT_LENGTH]}",
+                                            "textStyle": {
+                                                "color": "#698600"
+                                            },
+                                        }
+                                    )
             except DBAPIError as e:
                 print(repr(e))  # FIXME
                 db_session.remove()

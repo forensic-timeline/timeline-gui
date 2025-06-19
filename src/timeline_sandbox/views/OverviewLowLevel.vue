@@ -34,6 +34,7 @@ let openNodes = new Map()
 const TIME_RANGE = ["month", "day", "hour", "minute"]
 const aggregatePeriod = ref("month")
 const loadInvalidDate = ref(false)
+const mergeTimelines = ref(false)
 
 // Helper function
 function mapToJson(map) {
@@ -51,8 +52,9 @@ function mapToJson(map) {
  * @param openNodes Dicts of dicts {analyser: {entry_id: [[start_id, amount]]}} to expand. Empty array if none is selected.
  * @param aggregateBy Time interval for period ("month","day", "hour", or "minute"), unused if reqType = "event"
  * @param loadInvalid Flag, enable to load events before epoch time and current time which doesn't have valid timestamps
+ * @param doMergeTimelines Flag, enable to merge all categories into one timeline
  */
-async function retrieveData(openNodes, aggregateBy, loadInvalid) {
+async function retrieveData(openNodes, aggregateBy, loadInvalid, doMergeTimelines) {
     // Set flag
     let isSuccess = false
     isLoading.value = true
@@ -62,6 +64,7 @@ async function retrieveData(openNodes, aggregateBy, loadInvalid) {
     form.append("openNodes", mapToJson(openNodes))
     form.append("aggregateBy", aggregateBy)
     form.append("loadInvalid", JSON.stringify(loadInvalid))
+    form.append("doMergeTimelines", JSON.stringify(doMergeTimelines))
     const requestOptions = {
         method: "POST", // Using POST since assuming a lot of period nodes and analysers
         // Using GET search params could exceed max URL length
@@ -99,7 +102,7 @@ async function retrieveData(openNodes, aggregateBy, loadInvalid) {
 // the timelone won't update the nodes
 // also done by official examples
 async function reloadTimeline() {
-    if (await retrieveData(openNodes, aggregatePeriod.value, loadInvalidDate.value)) {
+    if (await retrieveData(openNodes, aggregatePeriod.value, loadInvalidDate.value, mergeTimelines.value)) {
         milestonesObj = milestones(d3MilestoneRef.value)
             .optimize(true)
             .orientation("horizontal")
@@ -134,7 +137,7 @@ function onClick(d) {
         // Checkbox logic
         // If analyser category key doesn't exists, create new
         if (!openNodes.has(nodeType["category"])) {
-            openNodes.set(nodeType["category"], new Map([[nodeType["entry_id"], [nodeType["start_id"], nodeType["text"]]]]))
+            openNodes.set(nodeType["category"], new Map([[nodeType["entry_id"], [nodeType["start_id"], nodeType["evt_count"]]]]))
         }
         else {
             // If node clicked already added, remove
@@ -142,21 +145,21 @@ function onClick(d) {
                 openNodes.get(nodeType["category"]).delete(nodeType["entry_id"])
             }
             else {
-                openNodes.get(nodeType["category"]).set(nodeType["entry_id"], [nodeType["start_id"], nodeType["text"]])
+                openNodes.get(nodeType["category"]).set(nodeType["entry_id"], [nodeType["start_id"], nodeType["evt_count"]])
             }
         }
         reloadTimeline()
-    } 
-    else if (nodeType["type"] == "event"){
+    }
+    else if (nodeType["type"] == "event") {
         console.log(nodeType) // TEST
         detailedView.value.loadRowID(parseInt(nodeType["event_id"]), false)
     }
-    
+
 }
 
 // Cleans selected node when changing period since 
 // entry_id will be refreshed
-function changePeriod(){
+function changePeriod() {
     openNodes = new Map()
     reloadTimeline()
 }
@@ -172,31 +175,35 @@ onMounted(() => {
 <template>
     <OverviewDetailedView :disabled="isLoading == 1" ref="detailedView"></OverviewDetailedView>
     <!-- Loading indicator -->
-    <v-overlay v-model="isLoading" class="align-center justify-center" contained> <v-progress-circular v-if="isLoading"
-            color="primary" indeterminate size="100"></v-progress-circular></v-overlay>
-    <!-- Inside card to give size of timeline -->
-    <v-col class="align-center justify-center">
-        <v-row>
-            <h3>NOTE: Time shown is based on current timezone</h3>
-        </v-row>
-        <v-row>
-            <v-col> <v-select :disabled="isLoading == 1" label="Select time range from grouping events"
-                    v-model="aggregatePeriod" :items="TIME_RANGE"></v-select></v-col>
-            <v-col> <v-btn @click="changePeriod" :disabled="isLoading == 1"> Reload timeline </v-btn>
-                <v-col><v-switch v-model="loadInvalidDate" :disabled="isLoading == 1"
-                        :label="`Load events with invalid timestamps?: ${(loadInvalidDate) ? `Yes` : `No`}`"></v-switch></v-col>
-            </v-col>
+    <v-overlay v-model="isLoading" class="align-center justify-center"> <v-progress-circular v-if="isLoading"
+            color="primary" indeterminate size="100"></v-progress-circular>
+    </v-overlay>
+        <!-- Inside card to give size of timeline -->
+        <v-col class="align-center justify-center">
+            <v-row>
+                <h3>NOTE: Time shown is based on current timezone</h3>
+            </v-row>
+            <v-row>
+                <v-col> <v-select :disabled="isLoading == 1" label="Select time range from grouping events"
+                        v-model="aggregatePeriod" :items="TIME_RANGE"></v-select></v-col>
+                <v-col>
+                    <v-btn @click="changePeriod" :disabled="isLoading == 1"> Reload timeline </v-btn>
+                    <v-switch v-model="loadInvalidDate" :disabled="isLoading == 1"
+                        :label="`Load events with invalid timestamps?: ${(loadInvalidDate) ? `Yes` : `No`}`"></v-switch>
+                    <v-switch v-model="mergeTimelines" :disabled="isLoading == 1"
+                        :label="`Merge all category into one timeline?: ${(mergeTimelines) ? `Yes` : `No`}`"></v-switch>
+                </v-col>
 
-        </v-row>
-        <v-row class="justify-center d-flex overflow-auto">
-            <v-card class="d-flex overflow-auto" color="grey-lighten-3" height="90vh" width="90vw">
-                <div class="d3Milestones">
-                    <div class="timeline" ref="d3_milestone"></div>
-                </div>
-            </v-card>
-        </v-row>
-    </v-col>
-
+            </v-row>
+            <v-row class="justify-center d-flex overflow-auto">
+                <v-card class="d-flex overflow-auto" color="grey-lighten-3" height="90vh" width="90vw">
+                    <div class="d3Milestones">
+                        <div class="timeline" ref="d3_milestone"></div>
+                    </div>
+                </v-card>
+            </v-row>
+        </v-col>
+    
 </template>
 
 <!-- 
@@ -208,6 +215,8 @@ CSS Comments:
 .wrapper = Keep the clickable text working since it's the child of .milestones__group__label-horizontal
 -->
 <style>
+
+
 .milestones__group__label__text__event--hover {
     background: cyan;
 }
@@ -218,12 +227,13 @@ CSS Comments:
 
 
 .timeline {
-    width: 200vw;
-    height: 100%;
+    width:200vw;
+    height:100vh;
+    margin: -20px -20px -20px -20px;
     padding: 20px 20px 20px 20px;
 }
 
-.milestones__group__label-horizontal{
+.milestones__group__label-horizontal {
     pointer-events: none;
 }
 
