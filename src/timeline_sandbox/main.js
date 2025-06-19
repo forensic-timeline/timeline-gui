@@ -16,6 +16,7 @@ import "d3-milestones/build/d3-milestones.css" //Test d3-milestones css
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 import OverviewLowLevel from './views/OverviewLowLevel.vue'
+import OverviewHighLevel from './views/OverviewHighLevel.vue'
 
 
 const router = createRouter(
@@ -50,10 +51,15 @@ const router = createRouter(
       }
       ,
       {
-        // TEST
         path: '/overview-low',
         name: 'overview_low',
         component: OverviewLowLevel
+      }
+      ,
+      {
+        path: '/overview-high',
+        name: 'overview_high',
+        component: OverviewHighLevel
       }
     ]
   }

@@ -72,7 +72,7 @@ async function retrieveData(openNodes, aggregateBy, loadInvalid, doMergeTimeline
         body: form
     };
     await fetch(
-        '/api/v1/timeline/low_level/overview',
+        '/api/v1/timeline/high_level/overview',
         requestOptions)
         .then(response => response.text() //Assumes error
             .then(data => ({
@@ -153,7 +153,7 @@ function onClick(d) {
     }
     else if (nodeType["type"] == "event") {
         console.log(nodeType) // TEST
-        detailedView.value.loadRowID(parseInt(nodeType["event_id"]), false)
+        detailedView.value.loadRowID(parseInt(nodeType["event_id"]), true)
     }
 
 }
@@ -174,7 +174,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <NavTabs eventType="overview_low"></NavTabs>
+    <NavTabs eventType="overview_high"></NavTabs>
     <OverviewDetailedView :disabled="isLoading == 1" ref="detailedView"></OverviewDetailedView>
     <!-- Loading indicator -->
     <v-overlay v-model="isLoading" class="align-center justify-center"> <v-progress-circular v-if="isLoading"

@@ -58,7 +58,7 @@ TABLE_VALUES = {
             "test_event_evidence",
             "low_level_event_id",
         ],
-        "overview_label_column": "type",
+        "overview_label_column": "event_type",
         "overview_text_column": "description"
     },
 }
@@ -78,11 +78,11 @@ OVERVIEW_TEXT_LENGTH = 20 # Limit length for overview timeline text description
 # Definition of db URL string using session value
 def returnDBURL():
     # TEST: TEST DB PATH
-    return (
-        "sqlite:///"
-        + r"D:\Moving\Documents\Universitas - MatKul\PraTA_TA_LaporanKP\TA"
-        + r"\Proj\dftpl_gui_proj\test\11062025.sqlite"
-    )
+    # return (
+    #     "sqlite:///"
+    #     + r"D:\Moving\Documents\Universitas - MatKul\PraTA_TA_LaporanKP\TA"
+    #     + r"\Proj\dftpl_gui_proj\test\11062025.sqlite"
+    # )
 
     return "sqlite:///" + join(
         current_app.config["UPLOAD_DIR"] + "\\" + f"{session['session_db']}"
@@ -119,7 +119,6 @@ def validISODateRange(date_range):
 # Join event row with labels to retrieve attached label (many to many)
 # Add "GROUP BY" clause for order of "GROUP_CONCAT" function
 # It's so only the filtered & concatenated events are included in the JOIN operation
-# TEST: Measure execution time for each page retrieval
 # FIXME: Error handling for all execution
 # Support for search, filter, sort, range?
 def get_page_event(
@@ -322,10 +321,9 @@ def get_page_event(
 @login_required
 def load_timeline(event_type):
     if event_type in ["low_level", "high_level"]:
-        # TODO: Replace with user's database session info
-        # TEST: Use test db to avoid processing with dftpl each test
+
         database_uri = returnDBURL()
-        db_engine = create_engine(database_uri, echo=True)  # TEST
+        db_engine = create_engine(database_uri)  # TEST
         db_session = scoped_session(
             sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
         )
@@ -418,7 +416,7 @@ def get_high_level_keys():
 
     keys_data = {}
     database_uri = returnDBURL()
-    db_engine = create_engine(database_uri, echo=True)  # TEST
+    db_engine = create_engine(database_uri)  # TEST
     db_session = scoped_session(
         sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
     )
@@ -452,10 +450,9 @@ def update_comments(event_type):
     ):
         if len(request.form["comment"]) > 200:
             return make_response("", 400)
-        # TODO: Replace with user's database session info
-        # TEST: Use test db to avoid processing with dftpl each test
+
         database_uri = returnDBURL()
-        db_engine = create_engine(database_uri, echo=True)
+        db_engine = create_engine(database_uri)
         db_session = scoped_session(
             sessionmaker(
                 autocommit=False,
@@ -530,6 +527,7 @@ def constructISO8601(
 # TODO: Default range is epoch time to current time. Anything else is assumed to be invalid timestamps
 # only loaded when loadInvalid flag is true
 @api.route("/timeline/<string:event_type>/overview", methods=["POST"])
+@login_required
 def timeline_overview(event_type):
     EPOCH_ISO = "1970-01-01T00:00:00.000000+00:00"
     TODAY_ISO = datetime.today().strftime("%Y-%m-%dT%H:%M:%S.%f%:z")
@@ -551,7 +549,7 @@ def timeline_overview(event_type):
         # TODO: Validate values
         if request.form["aggregateBy"] in list(STRFTIME_FORMAT_STRING.keys()):
             database_uri = returnDBURL()
-            db_engine = create_engine(database_uri) # TEST ECHO
+            db_engine = create_engine(database_uri, echo=True) # TEST ECHO
             db_session = scoped_session(
                 sessionmaker(
                     autocommit=False,
@@ -634,6 +632,7 @@ def timeline_overview(event_type):
                                         {
                                             "entry_id": index,
                                             "category": row[1],
+                                            "evt_count": row[3],
                                             "type": "period",
                                             "timestamp": row[2],
                                             "start_id": row[0],
@@ -720,6 +719,7 @@ def object_as_dict(obj):
 
 # Get a single event's data, for overview
 @api.route("/timeline/<string:event_type>/overview_detail", methods=["GET"])
+@login_required
 def overview_detail_event(event_type):
     if (
         event_type in ["low_level", "high_level"]
@@ -729,7 +729,7 @@ def overview_detail_event(event_type):
 
         event_data = {}
         database_uri = returnDBURL()
-        db_engine = create_engine(database_uri, echo=True)  # TEST
+        db_engine = create_engine(database_uri)  # TEST
         db_session = scoped_session(
             sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
         )
