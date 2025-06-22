@@ -212,7 +212,6 @@ function loadLabels(label_dict) {
 
 // onBeforeMount: Call retrieveData to get first page and max amount of page for pagination
 onMounted(async () => {
-    console.log("TEST") // TEST
     // Setup tabulator
     table = new Tabulator(data_table.value, {
         columns: tabulator_columns,
@@ -253,10 +252,6 @@ onMounted(async () => {
 watch ( props, async () => {
     current_page.value = (typeof +props.goToPage === "number" && !isNaN(+props.goToPage)) ? +props.goToPage : current_page.value
     dispatchEvent(page_num_changed)
-    console.log([
-        current_page.value,
-        props.goToPage
-    ]) // TEST
 })
 
 // TEST: Testing pagination events

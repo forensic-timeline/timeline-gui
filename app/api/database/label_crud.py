@@ -30,7 +30,6 @@ from app.api import api
 # Retrieve labels as a dict of {id: name}
 @api.route("/timeline/get_labels", methods=["GET"])
 @login_required
-# TEST: Add auth later
 def get_labels():
     database_uri = returnDBURL()
     db_engine = create_engine(database_uri, echo=True)
@@ -62,15 +61,12 @@ def get_labels():
 
 @api.route("/timeline/add_label", methods=["POST"])
 @login_required
-# TEST: Add auth later
 def add_label():
     if (
         "newLabel" in request.form and
         len("".join(request.form["newLabel"].split())) > 0 and # Check if string is not just whitespace
         len(request.form["newLabel"]) <= 50
     ):
-        # TODO: Replace with user's database session info
-        # TEST: Use test db to avoid processing with dftpl each test
         database_uri = returnDBURL()
         db_engine = create_engine(database_uri, echo=True)
         db_session = scoped_session(
@@ -100,7 +96,6 @@ def add_label():
 
 @api.route("/timeline/update_label", methods=["POST"])
 @login_required
-# TEST: Add auth later
 def update_label():
     if ("selectedLabel" in request.form and 
         "newLabel" in request.form and
@@ -111,8 +106,6 @@ def update_label():
             label_id = int(request.form["selectedLabel"])
         except ValueError as e:
             return make_response("Please select a label", 400)
-        # TODO: Replace with user's database session info
-        # TEST: Use test db to avoid processing with dftpl each test
         database_uri = returnDBURL()
         db_engine = create_engine(database_uri, echo=True)
         db_session = scoped_session(
@@ -142,7 +135,6 @@ def update_label():
 # Retrieve labels as a dict of {id: name}
 @api.route("/timeline/delete_label", methods=["POST"])
 @login_required
-# TEST: Add auth later
 def delete_label():
     if ("selectedLabel" in request.form
     ):
@@ -150,8 +142,6 @@ def delete_label():
             label_id = int(request.form["selectedLabel"])
         except ValueError as e:
             return make_response("", 400)
-        # TODO: Replace with user's database session info
-        # TEST: Use test db to avoid processing with dftpl each test
         database_uri = returnDBURL()
         db_engine = create_engine(database_uri, echo=True)
         db_session = scoped_session(
@@ -181,7 +171,6 @@ def delete_label():
 # Update label timeline many to many relationships
 @api.route("/timeline/<string:event_type>/u_labels", methods=["POST"])
 @login_required
-# TEST: Add auth later
 def update_event_labels(event_type):
     if (
         event_type in ["low_level", "high_level"]
@@ -192,8 +181,6 @@ def update_event_labels(event_type):
         # FIXME: Catch json loading error
         set_to_delete = loads(request.form["setToDelete"])
         set_to_add = loads(request.form["setToAdd"])
-        # TODO: Replace with user's database session info
-        # TEST: Use test db to avoid processing with dftpl each test
         database_uri = returnDBURL()
         db_engine = create_engine(database_uri, echo=True)  # TEST
         db_session = scoped_session(

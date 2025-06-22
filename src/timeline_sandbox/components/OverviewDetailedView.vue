@@ -71,7 +71,7 @@ async function retrieveData() {
     await fetch(
         '/api/v1/timeline/high_level/get_keys?' +
         new URLSearchParams({
-            rowID: (Number.isInteger(rowID.value) && rowID.value > 0) ? rowID.value : 0,
+            rowID: (Number.isInteger(rowID.value) && rowID.value > 0) ? rowID.value : 1,
         }).toString(),
         requestOptions1
     )

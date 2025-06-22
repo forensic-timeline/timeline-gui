@@ -1,6 +1,6 @@
 from os.path import join
 from math import ceil
-from json import loads
+from json import loads, dumps
 from re import match
 from datetime import datetime
 
@@ -514,9 +514,6 @@ def constructISO8601(
     else:
         return False
 
-
-# TEST API
-
 #  Retrieves all timeline data.
 #  @param openNodes Dicts of dicts {analyser: {entry_id: [[start_id, amount]]}} to expand. Empty array if none is selected.
 #  @param aggregateBy Time interval for period ("month","day", "hour", or "minute"), unused if reqType = "event"
@@ -549,7 +546,7 @@ def timeline_overview(event_type):
         # TODO: Validate values
         if request.form["aggregateBy"] in list(STRFTIME_FORMAT_STRING.keys()):
             database_uri = returnDBURL()
-            db_engine = create_engine(database_uri, echo=True) # TEST ECHO
+            db_engine = create_engine(database_uri) # TEST ECHO
             db_session = scoped_session(
                 sessionmaker(
                     autocommit=False,
@@ -664,6 +661,8 @@ def timeline_overview(event_type):
                                 ]
                             )
                     # Get all the event nodes
+                    # HACK: Text is wrapped in brackets since text ending in an image extension (.jpg) and maybe others
+                    # are treated as an image element
                     for [category, statement] in stmt2_arr:
                         for index, row in enumerate(db_session.execute(statement).all()):
                                 if is_merge_timelines:
@@ -673,7 +672,7 @@ def timeline_overview(event_type):
                                             "type": "event",
                                             "timestamp": row[2],
                                             "event_id": row[0],
-                                            "text": f"{category} ID {0}: {row[1][:OVERVIEW_TEXT_LENGTH]}",
+                                            "text": f"({category} ID {0}: {row[1][:OVERVIEW_TEXT_LENGTH]})",
                                             "textStyle": {
                                                 "color": "#698600"
                                             },
@@ -686,7 +685,7 @@ def timeline_overview(event_type):
                                             "type": "event",
                                             "timestamp": row[2],
                                             "event_id": row[0],
-                                            "text": f"ID {0}: {row[1][:OVERVIEW_TEXT_LENGTH]}",
+                                            "text": f"(ID {0}: {row[1][:OVERVIEW_TEXT_LENGTH]})",
                                             "textStyle": {
                                                 "color": "#698600"
                                             },
@@ -706,13 +705,13 @@ def timeline_overview(event_type):
                     500,
                 )
             
-            return result_json
+            return make_response(dumps(result_json), 200)
         else:
             return make_response("ERROR: Invalid Request", 400)
     else:
         return make_response("ERROR: Invalid Request", 400)
 
-# TEST
+
 def object_as_dict(obj):
     return {c.key: getattr(obj, c.key)
             for c in inspect(obj).mapper.column_attrs}
@@ -725,7 +724,7 @@ def overview_detail_event(event_type):
         event_type in ["low_level", "high_level"]
     ):
         # Get row id from GET Args
-        row_id = request.args.get("rowID", default=0, type=int)
+        row_id = request.args.get("rowID", default=1, type=int)
 
         event_data = {}
         database_uri = returnDBURL()
@@ -735,13 +734,10 @@ def overview_detail_event(event_type):
         )
         stmt = select(TABLE_VALUES[event_type]["model"]).where(TABLE_VALUES[event_type]["model"].id == row_id)
         if event_type == "high_level":
-            stmt2 = select(TLModel.Labels).where(TLModel.labels_high_level_events_table.c.high_level_events_id == row_id)
+            stmt2 = select(TLModel.Labels.name).join(TLModel.labels_high_level_events_table).where(TLModel.labels_high_level_events_table.c.high_level_events_id == row_id)
         else:
             stmt2 = select(TLModel.Labels.name).join(TLModel.labels_low_level_events_table).where(TLModel.labels_low_level_events_table.c.low_level_events_id == row_id)
         try:
-            # TEST
-            
-            # print(isinstance(db_session.scalars(stmt).first(), TABLE_VALUES[event_type]["model"]))
             event_data = object_as_dict(db_session.scalars(stmt).first())
             event_data["labels"] = "|".join(db_session.scalars(stmt2).all())
             db_session.remove()

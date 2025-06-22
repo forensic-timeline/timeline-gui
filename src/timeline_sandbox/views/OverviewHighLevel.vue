@@ -152,7 +152,6 @@ function onClick(d) {
         reloadTimeline()
     }
     else if (nodeType["type"] == "event") {
-        console.log(nodeType) // TEST
         detailedView.value.loadRowID(parseInt(nodeType["event_id"]), true)
     }
 

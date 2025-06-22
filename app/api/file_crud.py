@@ -176,7 +176,6 @@ def upload_file():
                         if len(spamreader.fieldnames) == len(DFTPL_CSV_COLUMNS):
                             for index, column in enumerate(spamreader.fieldnames):
                                 if column != DFTPL_CSV_COLUMNS[index]:
-                                    # TEST
                                     return make_response(
                                         (
                                             "ERROR: Invalid csv header, use default plaso csv output.",
@@ -275,7 +274,6 @@ def upload_file():
                             return make_response(("ERROR: Invalid sqlite file!", 400))
 
                     # If header is valid, upload DB
-                    # TEST: Save chunk
                     # Store to 'temp' folder with temporary extension
                     try:
                         with open(
@@ -327,7 +325,6 @@ def upload_file():
 
                         for index, row in enumerate(result):
                             if "".join(SCHEMA_TABLE_SQL_VAL[index].split()) != "".join(row[0].split()):
-                                print(row[0]) # TEST
                                 # Do these 3 to close DB connections
                                 result.close()  # Close result proxy con
                                 db_session.remove()
@@ -416,7 +413,6 @@ def undo_upload():
 
 @api.route("/download_db", methods=["GET"])
 # TODO: Add integrity hash check after file is downloaded, give user option to redo if corrupted.
-# TEST: Testing
 @login_required
 def download_file():
     if request.method == "GET":
