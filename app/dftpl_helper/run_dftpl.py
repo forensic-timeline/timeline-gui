@@ -10,7 +10,7 @@ from flask.sessions import SessionMixin
 # TODO: Add a function in dftpl to generate:
 # 1. dictionary mapping of all analyser classes
 # import dftpl.analyzers.useractivity.FileDownloads as FileDownloads
-import dftpl.analyzers.useractivity.RecentFileAccess as RecentFileAccess
+# import dftpl.analyzers.useractivity.RecentFileAccess as RecentFileAccess (Doesn't support dict of test events)
 # import dftpl.analyzers.useractivity.SoftwareInstallation as SoftwareInstallation
 import dftpl.analyzers.useractivity.USBConnectedRegDeviceClasses as USBConnectedRegDeviceClasses
 import dftpl.analyzers.useractivity.USBConnectedRegUSB as USBConnectedRegUSB
@@ -20,8 +20,8 @@ import dftpl.analyzers.useractivity.WindowsEventLogCleared as WindowsEventLogCle
 import dftpl.analyzers.useractivity.WindowsFirewallDisabled as WindowsFirewallDisabled
 import dftpl.analyzers.web.AllImagesFromCache as AllImagesFromCache
 # import dftpl.analyzers.web.AllVideoFromCache as AllVideoFromCache
-import dftpl.analyzers.web.BingSearch as BingSearch
-import dftpl.analyzers.web.GoogleSearch as GoogleSearch
+# import dftpl.analyzers.web.BingSearch as BingSearch
+# import dftpl.analyzers.web.GoogleSearch as GoogleSearch # Null key value due to regex capturing wrong descriptions
 import dftpl.analyzers.web.WebVisits as WebVisits
 import dftpl.analyzers.windows.DefaultBrowser as DefaultBrowser
 import dftpl.analyzers.windows.DeviceInstallation as DeviceInstallation
@@ -67,7 +67,7 @@ from app import current_app
 # Default analysers list, made a const for multiple functions
 DEFAULT_analyser = {
     # FileDownloads.description: FileDownloads,
-    RecentFileAccess.description: RecentFileAccess,
+    # RecentFileAccess.description: RecentFileAccess,
     # SoftwareInstallation.description: SoftwareInstallation, # Disabled since bug in dftpl
     USBConnectedRegDeviceClasses.description: USBConnectedRegDeviceClasses,
     USBConnectedRegUSB.description: USBConnectedRegUSB,
@@ -77,8 +77,8 @@ DEFAULT_analyser = {
     WindowsFirewallDisabled.description: WindowsFirewallDisabled,
     AllImagesFromCache.description: AllImagesFromCache,
     # AllVideoFromCache.description: AllVideoFromCache, # Disabled since bug in dftpl
-    BingSearch.description: BingSearch,
-    GoogleSearch.description: GoogleSearch,
+    # BingSearch.description: BingSearch,
+    # GoogleSearch.description: GoogleSearch,
     WebVisits.description: WebVisits,
     DefaultBrowser.description: DefaultBrowser,
     DeviceInstallation.description: DeviceInstallation,
