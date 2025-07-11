@@ -16,12 +16,15 @@
  */
 import { ref, useTemplateRef, onMounted, watchEffect } from 'vue'
 import OverviewDetailedView from '../components/OverviewDetailedView.vue'
+import SelectDateTime from '../components/SelectDateTime.vue';
 import NavTabs from '../components/NavTabs.vue';
 import milestones from 'd3-milestones'
 
 const d3MilestoneRef = useTemplateRef("d3_milestone") // d3-milestone DOM Ref
 const detailedView = useTemplateRef("detailedView")
 let milestonesObj = false // d3-milestone object reference
+const start_min_date = useTemplateRef("start_min_date")
+const end_min_date = useTemplateRef("end_min_date")
 
 const timelineJSON = ref([]) // timeline data
 const isLoading = ref(false) // flag for waiting for API response
@@ -36,6 +39,8 @@ const TIME_RANGE = ["month", "day", "hour", "minute"]
 const aggregatePeriod = ref("month")
 const loadInvalidDate = ref(false)
 const mergeTimelines = ref(false)
+// Variables for filter by min date range components
+const useTimeRange = ref(false)
 
 // Helper function
 function mapToJson(map) {
@@ -54,6 +59,7 @@ function mapToJson(map) {
  * @param aggregateBy Time interval for period ("month","day", "hour", or "minute"), unused if reqType = "event"
  * @param loadInvalid Flag, enable to load events before epoch time and current time which doesn't have valid timestamps
  * @param doMergeTimelines Flag, enable to merge all categories into one timeline
+ * @param minDateRangeArr Custom range where only events within the range is loaded. Takes precedence over loadInvalid.
  */
 async function retrieveData(openNodes, aggregateBy, loadInvalid, doMergeTimelines) {
     // Set flag
@@ -66,6 +72,7 @@ async function retrieveData(openNodes, aggregateBy, loadInvalid, doMergeTimeline
     form.append("aggregateBy", aggregateBy)
     form.append("loadInvalid", JSON.stringify(loadInvalid))
     form.append("doMergeTimelines", JSON.stringify(doMergeTimelines))
+    form.append("minDateRangeArr", (useTimeRange.value) ? JSON.stringify([start_min_date.value.datetimeISOString, end_min_date.value.datetimeISOString]) : "\"\"")
     const requestOptions = {
         method: "POST", // Using POST since assuming a lot of period nodes and analysers
         // Using GET search params could exceed max URL length
@@ -179,32 +186,55 @@ onMounted(() => {
     <v-overlay v-model="isLoading" class="align-center justify-center"> <v-progress-circular v-if="isLoading"
             color="primary" indeterminate size="100"></v-progress-circular>
     </v-overlay>
-        <!-- Inside card to give size of timeline -->
-        <v-col class="align-center justify-center">
-            <v-row>
-                <h3>NOTE: Time shown is based on current timezone</h3>
-            </v-row>
-            <v-row>
-                <v-col> <v-select :disabled="isLoading == 1" label="Select time range from grouping events"
-                        v-model="aggregatePeriod" :items="TIME_RANGE"></v-select></v-col>
-                <v-col>
-                    <v-btn @click="changePeriod" :disabled="isLoading == 1"> Reload timeline </v-btn>
-                    <v-switch v-model="loadInvalidDate" :disabled="isLoading == 1"
-                        :label="`Load events with invalid timestamps?: ${(loadInvalidDate) ? `Yes` : `No`}`"></v-switch>
-                    <v-switch v-model="mergeTimelines" :disabled="isLoading == 1"
-                        :label="`Merge all category into one timeline?: ${(mergeTimelines) ? `Yes` : `No`}`"></v-switch>
-                </v-col>
+    <!-- Inside card to give size of timeline -->
+    <v-col class="align-center justify-center">
+        <v-row>
+            <h3>NOTE: Time shown is based on current timezone</h3>
+        </v-row>
+        <v-row>
+            <v-col> <v-select :disabled="isLoading == 1" label="Select time range from grouping events"
+                    v-model="aggregatePeriod" :items="TIME_RANGE"></v-select></v-col>
+            <v-col>
+                <v-btn @click="changePeriod" :disabled="isLoading == 1"> Reload timeline </v-btn>
+                <v-switch v-model="loadInvalidDate" :disabled="isLoading == 1"
+                    :label="`Load all events including possibly invalid timestamps?: ${(loadInvalidDate) ? `Yes` : `No`}`"></v-switch>
+                <v-switch v-model="mergeTimelines" :disabled="isLoading == 1"
+                    :label="`Merge all category into one timeline?: ${(mergeTimelines) ? `Yes` : `No`}`"></v-switch>
+            </v-col>
 
-            </v-row>
-            <v-row class="justify-center d-flex overflow-auto">
-                <v-card class="d-flex overflow-auto" color="grey-lighten-3" height="90vh" width="90vw">
-                    <div class="d3Milestones">
-                        <div class="timeline" ref="d3_milestone"></div>
-                    </div>
-                </v-card>
-            </v-row>
-        </v-col>
-    
+        </v-row>
+        <!-- If user doesn't load all events, can select partial events -->
+        <v-row align="center" justify="center">
+            <v-card>
+                <v-col>
+                    <v-col><v-switch v-model="useTimeRange" :disabled="isLoading == 1 || loadInvalidDate == 1"
+                            :label="`Set custom time range of events?: ${(useTimeRange) ? `Yes` : `No`}`"></v-switch></v-col>
+                </v-col>
+                <v-col>
+                    <v-input :rules="date_rules">
+                        <v-card subtitle="Start date (Not included)">
+                            <SelectDateTime :disabled="isLoading == 1 || !useTimeRange  || loadInvalidDate == 1" ref="start_min_date">
+                            </SelectDateTime>
+                        </v-card>
+                        <v-card subtitle="End date (Not included)">
+                            <SelectDateTime :disabled="isLoading == 1 || !useTimeRange  || loadInvalidDate == 1" ref="end_min_date">
+                            </SelectDateTime>
+
+                        </v-card>
+                    </v-input>
+
+                </v-col>
+            </v-card>
+        </v-row>
+        <v-row class="justify-center d-flex overflow-auto">
+            <v-card class="d-flex overflow-auto" color="grey-lighten-3" height="90vh" width="90vw">
+                <div class="d3Milestones">
+                    <div class="timeline" ref="d3_milestone"></div>
+                </div>
+            </v-card>
+        </v-row>
+    </v-col>
+
 </template>
 
 <!-- 
@@ -216,8 +246,6 @@ CSS Comments:
 .wrapper = Keep the clickable text working since it's the child of .milestones__group__label-horizontal
 -->
 <style>
-
-
 .milestones__group__label__text__event--hover {
     background: cyan;
 }
@@ -228,8 +256,8 @@ CSS Comments:
 
 
 .timeline {
-    width:200vw;
-    height:100vh;
+    width: 200vw;
+    height: 100vh;
     margin: -20px -20px -20px -20px;
     padding: 20px 20px 20px 20px;
 }

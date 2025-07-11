@@ -526,14 +526,15 @@ def constructISO8601(
 @api.route("/timeline/<string:event_type>/overview", methods=["POST"])
 @login_required
 def timeline_overview(event_type):
-    EPOCH_ISO = "1970-01-01T00:00:00.000000+00:00"
-    TODAY_ISO = datetime.today().strftime("%Y-%m-%dT%H:%M:%S.%f%:z")
+    start_range = "1970-01-01T00:00:00.000000+00:00" # Unix epoch
+    end_range = datetime.today().strftime("%Y-%m-%dT%H:%M:%S.%f%:z")
     if (
         event_type in ["low_level", "high_level"]
         and "openNodes" in request.form
         and "aggregateBy" in request.form
         and "loadInvalid" in request.form
         and "doMergeTimelines" in request.form
+        and "minDateRangeArr" in request.form
     ):
         # Translates bool string to value
         is_load_invalid = False
@@ -542,6 +543,12 @@ def timeline_overview(event_type):
         is_merge_timelines = False
         if request.form["doMergeTimelines"] == "true":
             is_merge_timelines = True
+        minDateRangeArrList = loads(request.form["minDateRangeArr"])
+        # Override loadInvalid flag, min and max date, and load events within range in minDateRangeArr
+        if validISODateRange(minDateRangeArrList):
+            start_range = minDateRangeArrList[0]
+            end_range = minDateRangeArrList[1]
+            is_load_invalid = False
 
         # TODO: Validate values
         if request.form["aggregateBy"] in list(STRFTIME_FORMAT_STRING.keys()):
@@ -555,7 +562,7 @@ def timeline_overview(event_type):
                 )
             )
             result_json = []
-            is_load_invalid_str = f"AND date_time_min >= '{EPOCH_ISO}' AND date_time_min <= '{TODAY_ISO}' " if not is_load_invalid else ""
+            is_load_invalid_str = f"AND date_time_min >= '{start_range}' AND date_time_min <= '{end_range}' " if not is_load_invalid else ""
             # Get dict of periods, first
             stmt = text(
                 f"SELECT id, {TABLE_VALUES[event_type]['overview_label_column']}, date_time_min, COUNT(id) as event_num "
