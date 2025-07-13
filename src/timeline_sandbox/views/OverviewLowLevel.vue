@@ -42,6 +42,16 @@ const mergeTimelines = ref(false)
 // Variables for filter by min date range components
 const useTimeRange = ref(false)
 
+const date_rules = [
+    // Make sure min date is before max date
+    () => {
+        if (start_min_date.value.datetimeISOString > end_min_date.value.datetimeISOString) return 'Start date must be set before end date!'
+        else {
+            return true
+        }
+    }
+]
+
 // Helper function
 function mapToJson(map) {
     const obj = {};
